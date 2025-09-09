@@ -41,11 +41,7 @@ const defaultPal = { ...pal };
 let t = 0;
 let paused = false;
 let sources = [];
-const stats = {
-  fps: 0,
-  sourcesCount: 0,
-  wavesDrawn: 0,
-};
+const stats = { fps: 0, sourcesCount: 0, wavesDrawn: 0 };
 
 // ---------------------
 // Pool di Vettori per Ottimizzazione
@@ -69,14 +65,13 @@ const returnToPool = (v) => {
 let waveLayer;
 
 // ===================================================================
-// NUOVA FUNZIONE PER DISEGNARE IL CUORE
+// FUNZIONE PER DISEGNARE IL CUORE
 // ===================================================================
 function drawHeartShapeUniversal(c, x, y, size) {
   c.push();
   c.translate(x, y);
   c.scale(size / 100.25);
   c.translate(-50.125, -39.795);
-
   c.noFill();
   c.beginShape();
   c.vertex(64.77, 6.19);
@@ -91,7 +86,6 @@ function drawHeartShapeUniversal(c, x, y, size) {
   c.bezierVertex(102.15, 27.39, 102.15, 14.28, 94.06, 6.19);
   c.bezierVertex(85.97, -1.9, 72.86, -1.9, 64.77, 6.19);
   c.endShape(c.CLOSE);
-
   c.pop();
 }
 
@@ -109,10 +103,7 @@ function setup() {
   pixelDensity(1);
   frameRate(60);
 
-  // Layer per tutte le onde
   waveLayer = createGraphics(width, height);
-  if (config.saveBackground) waveLayer.background(pal.bg);
-  else waveLayer.clear();
   waveLayer.noFill();
   waveLayer.strokeCap(SQUARE);
 
@@ -124,34 +115,39 @@ function draw() {
   const dt = paused ? 0 : deltaTime / 1000;
   t += dt;
 
-  background(pal.bg);
-  image(waveLayer, 0, 0);
+  if (config.saveBackground) waveLayer.background(pal.bg);
+  else waveLayer.clear();
 
-  stats.wavesDrawn = 0;
+  waveLayer.push();
+  waveLayer.clip(() => {
+    waveLayer.rect(0, 0, width, height);
+  });
+
   for (let i = sources.length - 1; i >= 0; i--) {
     const src = sources[i];
     src.update(dt);
-    stats.wavesDrawn += src.drawWaveLayer(waveLayer);
-
+    src.drawWaveLayer(waveLayer);
     if (!src.isAlive()) {
       src.destroy();
       sources.splice(i, 1);
     }
   }
 
+  waveLayer.pop();
+
+  background(pal.bg);
+  image(waveLayer, 0, 0);
+
   updateStats();
 }
 
-// --- NUOVA FUNZIONE PER IL RESIZE ---
 function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
   const formatSelect = document.getElementById("format-select");
-
   resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
   waveLayer.resizeCanvas(width, height);
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
-
   formatSelect.value = "viewport";
 }
 
@@ -200,9 +196,15 @@ function initializeUI() {
     });
   });
 
-  document
-    .getElementById("save-waves-btn")
-    .addEventListener("click", saveWaves);
+  document.getElementById("save-waves-btn").addEventListener("click", () => {
+    const format = document.getElementById("export-format").value;
+    if (format === "svg") {
+      saveWavesSVG();
+    } else {
+      saveWaves();
+    }
+  });
+
   document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", clearSources);
   document
@@ -281,7 +283,6 @@ function updateStats() {
 function mousePressed(event) {
   const sidebar = document.getElementById("ui-sidebar");
   if (event.target.closest("#ui-sidebar")) return;
-
   if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
     if (sources.length < config.maxSources)
       sources.unshift(new WaveSource(mouseX, mouseY));
@@ -307,6 +308,8 @@ function togglePause() {
 function clearSources() {
   sources.forEach((src) => src.destroy());
   sources = [];
+  if (config.saveBackground) waveLayer.background(pal.bg);
+  else waveLayer.clear();
 }
 
 function resetSimulation() {
@@ -335,30 +338,188 @@ function resizeCanvasAndContent(w, h) {
 }
 
 // ===================================================================
-// FUNZIONE DI SALVATAGGIO CORRETTA
+// FUNZIONE SALVATAGGIO PNG
 // ===================================================================
 function saveWaves() {
-  // Creiamo un canvas temporaneo con trasparenza
   const tempCanvas = createGraphics(width, height);
-  tempCanvas.clear(); // Canvas trasparente di default
+  if (config.saveBackground) tempCanvas.background(pal.bg);
+  else tempCanvas.clear();
 
-  // Se saveBackground è true, impostiamo lo sfondo
-  if (config.saveBackground) {
-    tempCanvas.background(pal.bg);
-  }
-
-  // Disegniamo tutte le onde sul canvas temporaneo
-  for (const src of sources) {
+  for (let i = sources.length - 1; i >= 0; i--) {
+    const src = sources[i];
     src.drawWaveLayer(tempCanvas);
   }
 
-  // Salviamo il PNG
   tempCanvas.save("onde.png");
   tempCanvas.remove();
 }
 
 // ===================================================================
-// CLASSE WaveSource E LOGICA DI DISEGNO
+// FUNZIONE SALVATAGGIO SVG
+// ===================================================================
+function saveWavesSVG() {
+  const svgParts = [];
+  const w = width;
+  const h = height;
+  svgParts.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+  );
+  if (config.saveBackground)
+    svgParts.push(`<rect width="100%" height="100%" fill="${pal.bg}"/>`);
+
+  function getHeartPath(x, y, size) {
+    const scale = size / 100.25;
+    const offsetX = x - 50.125 * scale;
+    const offsetY = y - 39.795 * scale;
+
+    let path =
+      "M " +
+      (64.77 * scale + offsetX) +
+      " " +
+      (6.19 * scale + offsetY) +
+      " L " +
+      (50.13 * scale + offsetX) +
+      " " +
+      (20.83 * scale + offsetY) +
+      " L " +
+      (35.49 * scale + offsetX) +
+      " " +
+      (6.19 * scale + offsetY) +
+      " C " +
+      (27.4 * scale + offsetX) +
+      " " +
+      (-1.9 * scale + offsetY) +
+      ", " +
+      (14.29 * scale + offsetX) +
+      " " +
+      (-1.9 * scale + offsetY) +
+      ", " +
+      (6.2 * scale + offsetX) +
+      " " +
+      (6.19 * scale + offsetY) +
+      " C " +
+      (-2.29 * scale + offsetX) +
+      " " +
+      (14.28 * scale + offsetY) +
+      ", " +
+      (-2.29 * scale + offsetX) +
+      " " +
+      (27.39 * scale + offsetY) +
+      ", " +
+      (6.2 * scale + offsetX) +
+      " " +
+      (35.48 * scale + offsetY) +
+      " L " +
+      (20.84 * scale + offsetX) +
+      " " +
+      (50.12 * scale + offsetY) +
+      " L " +
+      (50.13 * scale + offsetX) +
+      " " +
+      (79.41 * scale + offsetY) +
+      " L " +
+      (79.42 * scale + offsetX) +
+      " " +
+      (50.12 * scale + offsetY) +
+      " L " +
+      (94.06 * scale + offsetX) +
+      " " +
+      (35.48 * scale + offsetY) +
+      " C " +
+      (102.15 * scale + offsetX) +
+      " " +
+      (27.39 * scale + offsetY) +
+      ", " +
+      (102.15 * scale + offsetX) +
+      " " +
+      (14.28 * scale + offsetY) +
+      ", " +
+      (94.06 * scale + offsetX) +
+      " " +
+      (6.19 * scale + offsetY) +
+      " C " +
+      (85.97 * scale + offsetX) +
+      " " +
+      (-1.9 * scale + offsetY) +
+      ", " +
+      (72.86 * scale + offsetX) +
+      " " +
+      (-1.9 * scale + offsetY) +
+      ", " +
+      (64.77 * scale + offsetX) +
+      " " +
+      (6.19 * scale + offsetY) +
+      " Z";
+    return path;
+  }
+
+  for (let i = sources.length - 1; i >= 0; i--) {
+    const src = sources[i];
+    const waves = [
+      {
+        type: "primary",
+        speed: config.speedPrimary,
+        interval: config.intervalPrimary,
+        stroke: config.strokePrimary,
+        alpha: config.alphaPrimary,
+        color: pal.stroke,
+        decay: config.decayFactorPrimary,
+      },
+      {
+        type: "secondary",
+        speed: config.speedSecondary,
+        interval: config.intervalSecondary,
+        stroke: config.strokeSecondary,
+        alpha: config.alphaSecondary,
+        color: pal.stroke2,
+        decay: config.decayFactorSecondary,
+      },
+    ];
+
+    for (const wave of waves) {
+      for (const s of src.imageSources) {
+        for (let j = 0; j < config.maxWaves; j++) {
+          const r = wave.speed * (src.t - j * wave.interval);
+          if (r < 0) continue;
+
+          if (s.x + r < 0 || s.x - r > w || s.y + r < 0 || s.y - r > h)
+            continue;
+
+          const alpha = calcAlpha(
+            wave.alpha,
+            r,
+            Math.hypot(width, height),
+            wave.decay
+          );
+          if (alpha < config.alphaThreshold) continue;
+
+          svgParts.push(
+            `<path d="${getHeartPath(s.x, s.y, r * 2)}" fill="none" stroke="${
+              wave.color
+            }" stroke-opacity="${alpha.toFixed(3)}" stroke-width="${
+              wave.stroke
+            }" />`
+          );
+        }
+      }
+    }
+  }
+
+  svgParts.push("</svg>");
+  const svgBlob = new Blob([svgParts.join("\n")], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(svgBlob);
+  link.download = "onde.svg";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+// ===================================================================
+// CLASSE WaveSource
 // ===================================================================
 class WaveSource {
   constructor(x, y) {
@@ -368,8 +529,9 @@ class WaveSource {
     this.calculateImageSources();
   }
 
+  // VERSIONE AGGIORNATA: ora salva anche la direzione del riflesso
   calculateImageSources() {
-    this.imageSources.forEach((v) => returnToPool(v));
+    this.imageSources.forEach((s) => returnToPool(s.pos));
     this.imageSources = [];
     const r = config.maxReflections;
     for (let ix = -r; ix <= r; ix++) {
@@ -382,7 +544,13 @@ class WaveSource {
           iy % 2 === 0
             ? this.pos.y + iy * height
             : height - this.pos.y + iy * height;
-        this.imageSources.push(getPooledVector(sx, sy));
+
+        // Aggiungiamo le informazioni sulla scala (1 = normale, -1 = specchiato)
+        this.imageSources.push({
+          pos: getPooledVector(sx, sy),
+          scaleX: ix % 2 === 0 ? 1 : -1,
+          scaleY: iy % 2 === 0 ? 1 : -1,
+        });
       }
     }
   }
@@ -416,6 +584,7 @@ class WaveSource {
     return total;
   }
 
+  // VERSIONE AGGIORNATA: applica il ribaltamento prima di disegnare
   drawWave(
     imgSources,
     speed,
@@ -430,18 +599,30 @@ class WaveSource {
     let wavesDrawn = 0;
     c.strokeWeight(strokeW);
     for (const s of imgSources) {
+      // s ora è un oggetto {pos, scaleX, scaleY}
       for (let i = 0; i < config.maxWaves; i++) {
         const r = speed * (this.t - i * interval);
         if (r < 0) continue;
         if (r > maxR) break;
-        if (!isCircleVisible(s.x, s.y, r)) continue;
+        if (!isCircleVisible(s.pos.x, s.pos.y, r)) continue;
         const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
         if (alpha < config.alphaThreshold) continue;
         const hexAlpha = Math.floor(alpha * 255)
           .toString(16)
           .padStart(2, "0");
         c.stroke(`${color}${hexAlpha}`);
-        drawHeartShapeUniversal(c, s.x, s.y, r * 2);
+
+        // --- MODIFICA CHIAVE ---
+        c.push();
+        // Sposta l'origine al centro dell'onda riflessa
+        c.translate(s.pos.x, s.pos.y);
+        // Applica il ribaltamento speculare
+        c.scale(s.scaleX, s.scaleY);
+        // Disegna il cuore all'origine (0,0) perché siamo già traslati
+        drawHeartShapeUniversal(c, 0, 0, r * 2);
+        c.pop();
+        // --- FINE MODIFICA ---
+
         wavesDrawn++;
       }
     }
@@ -468,8 +649,7 @@ class WaveSource {
   }
 
   destroy() {
-    returnToPool(this.pos);
-    this.imageSources.forEach((v) => returnToPool(v));
+    this.imageSources.forEach((s) => returnToPool(s.pos));
     this.imageSources = [];
   }
 }

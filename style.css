@@ -15,7 +15,7 @@ body {
   font-family: var(--font-family);
   background-color: var(--bg-color);
   color: var(--text-color);
-  overflow: hidden; /* Evita scrollbar */
+  overflow: hidden;
 }
 
 #app-container {
@@ -29,8 +29,8 @@ body {
   justify-content: center;
   align-items: center;
   padding: 20px;
-  min-width: 0; /* Permette al container di restringersi */
-  overflow: auto; /* Mostra le scrollbar se il canvas è troppo grande */
+  min-width: 0;
+  overflow: auto;
 }
 
 canvas {
@@ -38,14 +38,14 @@ canvas {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* --- Sidebar --- */
+/* Sidebar */
 #ui-sidebar {
   width: 300px;
   background-color: var(--sidebar-bg);
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  overflow-y: auto; /* Scrollbar se il contenuto è troppo */
+  overflow-y: auto;
 }
 
 #ui-sidebar header {
@@ -65,7 +65,7 @@ canvas {
   color: #666;
 }
 
-/* --- Pannelli Accordion --- */
+/* Accordion Panels */
 .ui-panel {
   border-bottom: 1px solid var(--border-color);
 }
@@ -94,18 +94,19 @@ canvas {
 
 .panel-content {
   padding: 15px 20px;
-  display: none; /* Nascosto di default */
+  display: none;
   background-color: white;
 }
 .panel-content.show {
-  display: block; /* Mostrato con JS */
+  display: block;
 }
 
-/* --- Stili Controlli --- */
+/* Controls */
 .slider-group,
 .color-picker-group,
 .checkbox-group,
-.preset-group {
+.preset-group,
+.export-format-group {
   margin-bottom: 15px;
 }
 
@@ -161,31 +162,46 @@ input[type="color"] {
   cursor: pointer;
 }
 
-/* Stili per il pannello Formati */
 #custom-format-inputs {
   display: flex;
   gap: 15px;
   margin-bottom: 15px;
 }
-
 #custom-format-inputs .input-group {
   flex-grow: 1;
 }
-
 #custom-format-inputs input[type="number"] {
   width: 100%;
   padding: 8px;
   border: 1px solid var(--border-color);
   border-radius: 5px;
-  box-sizing: border-box; /* Importante per non far strabordare il padding */
+  box-sizing: border-box;
 }
 
-/* Classe utility per nascondere elementi */
 .hidden {
   display: none !important;
 }
 
-/* --- Bottoni --- */
+/* Export Format */
+.export-format-group {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+}
+.export-format-group label {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 5px;
+}
+.export-format-group select {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: white;
+  cursor: pointer;
+}
+
+/* Buttons */
 button {
   width: 100%;
   padding: 10px;
@@ -210,9 +226,9 @@ select {
   background-color: white;
 }
 
-/* --- Footer --- */
+/* Footer */
 #ui-sidebar footer {
-  margin-top: auto; /* Spinge il footer in basso */
+  margin-top: auto;
   padding: 15px;
   background: var(--header-bg);
   border-top: 1px solid var(--border-color);
@@ -245,56 +261,42 @@ select {
   margin-top: 10px;
 }
 
-/* --- Regole per Dispositivi Mobili --- */
+/* Mobile */
 @media (max-width: 768px) {
   #app-container {
-    /* Cambia la direzione da orizzontale a verticale */
     flex-direction: column;
-    height: auto; /* Permette lo scroll se necessario */
+    height: auto;
     overflow-y: auto;
   }
-
   #canvas-container {
-    /* Fissa l'altezza del canvas a circa metà schermo */
     height: 50vh;
     padding: 10px;
-    box-sizing: border-box; /* Assicura che il padding non aumenti la dimensione */
+    box-sizing: border-box;
   }
-
   #ui-sidebar {
-    width: 100%; /* La sidebar ora occupa tutta la larghezza */
-    height: auto; /* L'altezza si adatta al contenuto */
-    border-left: none; /* Rimuove il bordo laterale inutile */
-    border-top: 2px solid var(--border-color); /* Aggiunge un bordo sopra */
+    width: 100%;
+    height: auto;
+    border-left: none;
+    border-top: 2px solid var(--border-color);
   }
-
-  /* Chiudiamo i pannelli di default per risparmiare spazio */
   .panel-content {
     display: none;
   }
-
-  /* Ingrandiamo i controlli per renderli più facili da toccare */
   label,
   button,
   select {
     font-size: 15px;
   }
-
   button,
   select {
     padding: 12px;
   }
-
-  input[type="range"]::-webkit-slider-thumb {
-    width: 24px;
-    height: 24px;
-  }
+  input[type="range"]::-webkit-slider-thumb,
   input[type="range"]::-moz-range-thumb {
     width: 24px;
     height: 24px;
   }
-
   #shortcuts {
-    display: none; /* Nasconde le scorciatoie da tastiera su mobile */
+    display: none;
   }
 }
