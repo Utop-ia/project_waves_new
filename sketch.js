@@ -42,6 +42,7 @@ let t = 0;
 let paused = false;
 let sources = [];
 const stats = { fps: 0, sourcesCount: 0, wavesDrawn: 0 };
+let maxR;
 
 // ---------------------
 // Pool di Vettori per Ottimizzazione
@@ -103,6 +104,8 @@ function setup() {
   pixelDensity(1);
   frameRate(60);
 
+  maxR = Math.hypot(width, height);
+
   waveLayer = createGraphics(width, height);
   waveLayer.noFill();
   waveLayer.strokeCap(SQUARE);
@@ -138,6 +141,15 @@ function draw() {
   background(pal.bg);
   image(waveLayer, 0, 0);
 
+  if (paused) {
+    fill(0, 0, 0, 150);
+    rect(0, 0, width, height);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(50);
+    text("PAUSA", width / 2, height / 2);
+  }
+
   updateStats();
 }
 
@@ -145,6 +157,9 @@ function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
   const formatSelect = document.getElementById("format-select");
   resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
+
+  maxR = Math.hypot(width, height);
+
   waveLayer.resizeCanvas(width, height);
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
@@ -196,15 +211,9 @@ function initializeUI() {
     });
   });
 
-  document.getElementById("save-waves-btn").addEventListener("click", () => {
-    const format = document.getElementById("export-format").value;
-    if (format === "svg") {
-      saveWavesSVG();
-    } else {
-      saveWaves();
-    }
-  });
-
+  document
+    .getElementById("save-waves-btn")
+    .addEventListener("click", saveWaves);
   document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", clearSources);
   document
@@ -365,7 +374,6 @@ class WaveSource {
     this.calculateImageSources();
   }
 
-  // VERSIONE AGGIORNATA: ora salva anche la direzione del riflesso
   calculateImageSources() {
     this.imageSources.forEach((s) => returnToPool(s.pos));
     this.imageSources = [];
@@ -380,8 +388,6 @@ class WaveSource {
           iy % 2 === 0
             ? this.pos.y + iy * height
             : height - this.pos.y + iy * height;
-
-        // Aggiungiamo le informazioni sulla scala (1 = normale, -1 = specchiato)
         this.imageSources.push({
           pos: getPooledVector(sx, sy),
           scaleX: ix % 2 === 0 ? 1 : -1,
@@ -420,7 +426,6 @@ class WaveSource {
     return total;
   }
 
-  // VERSIONE AGGIORNATA: applica il ribaltamento prima di disegnare
   drawWave(
     imgSources,
     speed,
@@ -431,11 +436,9 @@ class WaveSource {
     decayFactor,
     c
   ) {
-    const maxR = Math.hypot(c.width, c.height);
     let wavesDrawn = 0;
     c.strokeWeight(strokeW);
     for (const s of imgSources) {
-      // s ora è un oggetto {pos, scaleX, scaleY}
       for (let i = 0; i < config.maxWaves; i++) {
         const r = speed * (this.t - i * interval);
         if (r < 0) continue;
@@ -447,18 +450,11 @@ class WaveSource {
           .toString(16)
           .padStart(2, "0");
         c.stroke(`${color}${hexAlpha}`);
-
-        // --- MODIFICA CHIAVE ---
         c.push();
-        // Sposta l'origine al centro dell'onda riflessa
         c.translate(s.pos.x, s.pos.y);
-        // Applica il ribaltamento speculare
         c.scale(s.scaleX, s.scaleY);
-        // Disegna il cuore all'origine (0,0) perché siamo già traslati
         drawHeartShapeUniversal(c, 0, 0, r * 2);
         c.pop();
-        // --- FINE MODIFICA ---
-
         wavesDrawn++;
       }
     }
@@ -466,7 +462,6 @@ class WaveSource {
   }
 
   isAlive() {
-    const maxR = Math.hypot(width, height);
     const oldestWaveTime =
       this.t -
       (config.maxWaves - 1) *
