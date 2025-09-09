@@ -244,3 +244,36 @@ select {
   text-align: center;
   margin-top: 10px;
 }
+
+/* --- Regole per Dispositivi Mobili --- */
+@media (max-width: 768px) {
+  #app-container {
+    /* Cambia la direzione da orizzontale a verticale */
+    flex-direction: column;
+    height: auto; /* Permette lo scroll se necessario */
+    overflow-y: auto;
+  }
+
+  #canvas-container {
+    /* Fissa l'altezza del canvas a circa metà schermo */
+    height: 50vh;
+    padding: 10px;
+    box-sizing: border-box; /* Assicura che il padding non aumenti la dimensione */
+  }
+
+  #ui-sidebar {
+    width: 100%; /* La sidebar ora occupa tutta la larghezza */
+    height: auto; /* L'altezza si adatta al contenuto */
+    border-left: none; /* Rimuove il bordo laterale inutile */
+    border-top: 2px solid var(--border-color); /* Aggiunge un bordo sopra */
+  }
+
+  /* Chiudiamo i pannelli di default per risparmiare spazio */
+  .panel-content {
+    display: none;
+  }
+
+  #shortcuts {
+    display: none; /* Nasconde le scorciatoie da tastiera su mobile */
+  }
+}

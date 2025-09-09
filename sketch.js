@@ -101,7 +101,10 @@ function drawHeartShape(x, y, size) {
 
 function setup() {
   const canvasContainer = document.getElementById("canvas-container");
-  const canvas = createCanvas(595, 842);
+  const canvas = createCanvas(
+    canvasContainer.clientWidth,
+    canvasContainer.clientHeight
+  );
   canvas.parent(canvasContainer);
 
   pixelDensity(1);
@@ -109,7 +112,7 @@ function setup() {
 
   initializeUI();
   updateUIFromState();
-  console.log("Sketch con cuore disegnato via codice caricato!");
+  console.log("Sketch completo (con cerchi) caricato con successo!");
 }
 
 function draw() {
@@ -138,6 +141,11 @@ function draw() {
 
   pop();
   updateStats();
+}
+
+function windowResized() {
+  const canvasContainer = document.getElementById("canvas-container");
+  resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
 }
 
 // ===================================================================
