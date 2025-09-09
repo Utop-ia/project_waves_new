@@ -116,13 +116,13 @@ label {
   color: #555;
 }
 
-/* --- NUOVO STILE PER SLIDER + INPUT NUMERICO --- */
 .slider-input-wrapper {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+/* --- MODIFICA CHIAVE QUI --- */
 .slider-input-wrapper .value-input {
   width: 60px;
   padding: 5px;
@@ -130,17 +130,19 @@ label {
   border-radius: 5px;
   text-align: center;
   font-size: 13px;
-  -moz-appearance: textfield; /* Nasconde le freccette in Firefox */
+  -moz-appearance: textfield; /* Per Firefox */
+  appearance: none; /* Per i browser moderni */
 }
 
 .slider-input-wrapper .value-input::-webkit-outer-spin-button,
 .slider-input-wrapper .value-input::-webkit-inner-spin-button {
-  -webkit-appearance: none; /* Nasconde le freccette in Chrome/Safari */
+  -webkit-appearance: none; /* Per Chrome/Safari */
   margin: 0;
 }
+/* --- FINE MODIFICA --- */
 
 input[type="range"] {
-  flex-grow: 1; /* Lo slider occupa lo spazio rimanente */
+  flex-grow: 1;
   width: 100%;
   -webkit-appearance: none;
   appearance: none;
