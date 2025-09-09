@@ -273,6 +273,27 @@ select {
     display: none;
   }
 
+  /* Ingrandiamo i controlli per renderli più facili da toccare */
+  label,
+  button,
+  select {
+    font-size: 15px;
+  }
+
+  button,
+  select {
+    padding: 12px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+  }
+
   #shortcuts {
     display: none; /* Nasconde le scorciatoie da tastiera su mobile */
   }
