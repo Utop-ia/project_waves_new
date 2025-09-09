@@ -142,13 +142,24 @@ function draw() {
 // Questa funzione viene chiamata da p5.js ogni volta che la finestra cambia dimensione.
 function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
+  const formatSelect = document.getElementById("format-select");
+
   resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
+
+  // Se il canvas viene ridimensionato con la finestra,
+  // assicuriamoci che il menu mostri "Superficie di Visualizzazione".
+  formatSelect.value = "viewport";
 }
 
 // ===================================================================
 // GESTIONE UI
 // ===================================================================
+// ===================================================================
+// GESTIONE UI
+// ===================================================================
+
 function initializeUI() {
+  // ... (la prima parte di initializeUI rimane invariata) ...
   document.querySelectorAll(".panel-header").forEach((header) => {
     header.addEventListener("click", () => {
       header.classList.toggle("active");
@@ -213,13 +224,22 @@ function initializeUI() {
     }
   });
 
+  // --- LOGICA DEL PULSANTE "APPLICA FORMATO" MODIFICATA ---
   applyFormatBtn.addEventListener("click", () => {
     let newWidth, newHeight;
     const selectedValue = formatSelect.value;
-    if (selectedValue === "custom") {
+    const canvasContainer = document.getElementById("canvas-container");
+
+    if (selectedValue === "viewport") {
+      // Se si sceglie "Superficie di Visualizzazione"
+      newWidth = canvasContainer.clientWidth;
+      newHeight = canvasContainer.clientHeight;
+    } else if (selectedValue === "custom") {
+      // Se si sceglie il formato personalizzato
       newWidth = customWidthInput.value;
       newHeight = customHeightInput.value;
     } else {
+      // Per tutti gli altri formati predefiniti
       [newWidth, newHeight] = selectedValue.split("x");
     }
     resizeCanvasAndContent(newWidth, newHeight);
