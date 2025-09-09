@@ -116,13 +116,31 @@ label {
   color: #555;
 }
 
-.value-display {
-  float: right;
-  font-weight: 600;
-  color: var(--accent-color);
+/* --- NUOVO STILE PER SLIDER + INPUT NUMERICO --- */
+.slider-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-input-wrapper .value-input {
+  width: 60px;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  text-align: center;
+  font-size: 13px;
+  -moz-appearance: textfield; /* Nasconde le freccette in Firefox */
+}
+
+.slider-input-wrapper .value-input::-webkit-outer-spin-button,
+.slider-input-wrapper .value-input::-webkit-inner-spin-button {
+  -webkit-appearance: none; /* Nasconde le freccette in Chrome/Safari */
+  margin: 0;
 }
 
 input[type="range"] {
+  flex-grow: 1; /* Lo slider occupa lo spazio rimanente */
   width: 100%;
   -webkit-appearance: none;
   appearance: none;
