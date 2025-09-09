@@ -67,15 +67,9 @@ const returnToPool = (v) => {
 // NUOVA FUNZIONE PER DISEGNARE IL CUORE
 // ===================================================================
 function drawHeartShape(x, y, size) {
-  // Questa funzione disegna il tuo cuore SVG usando i comandi di p5.js
-  // È stata generata traducendo i dati che mi hai fornito.
-
-  // Scala e centra il disegno
   push();
   translate(x, y);
-  // Il viewBox originale era circa 100x80. Scaliamo in base a quello.
   scale(size / 100.25);
-  // Centriamo il disegno rispetto al suo centro originale (circa 50, 40)
   translate(-50.125, -39.795);
 
   beginShape();
@@ -101,6 +95,8 @@ function drawHeartShape(x, y, size) {
 
 function setup() {
   const canvasContainer = document.getElementById("canvas-container");
+  // --- MODIFICA CHIAVE ---
+  // Il canvas ora si adatta al suo contenitore HTML.
   const canvas = createCanvas(
     canvasContainer.clientWidth,
     canvasContainer.clientHeight
@@ -112,7 +108,6 @@ function setup() {
 
   initializeUI();
   updateUIFromState();
-  console.log("Sketch completo (con cerchi) caricato con successo!");
 }
 
 function draw() {
@@ -143,6 +138,8 @@ function draw() {
   updateStats();
 }
 
+// --- NUOVA FUNZIONE PER IL RESIZE ---
+// Questa funzione viene chiamata da p5.js ogni volta che la finestra cambia dimensione.
 function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
   resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
@@ -151,7 +148,6 @@ function windowResized() {
 // ===================================================================
 // GESTIONE UI
 // ===================================================================
-
 function initializeUI() {
   document.querySelectorAll(".panel-header").forEach((header) => {
     header.addEventListener("click", () => {
