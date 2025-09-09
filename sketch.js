@@ -63,40 +63,43 @@ const returnToPool = (v) => {
   if (vectorPool.length < 500) vectorPool.push(v);
 };
 
+// ---------------------
+// Layer off-screen per onde
+// ---------------------
+let waveLayer;
+
 // ===================================================================
 // NUOVA FUNZIONE PER DISEGNARE IL CUORE
 // ===================================================================
-function drawHeartShape(x, y, size) {
-  push();
-  translate(x, y);
-  scale(size / 100.25);
-  translate(-50.125, -39.795);
+function drawHeartShapeUniversal(c, x, y, size) {
+  c.push();
+  c.translate(x, y);
+  c.scale(size / 100.25);
+  c.translate(-50.125, -39.795);
 
-  beginShape();
-  vertex(64.77, 6.19);
-  vertex(50.13, 20.83);
-  vertex(35.49, 6.19);
-  bezierVertex(27.4, -1.9, 14.29, -1.9, 6.2, 6.19);
-  bezierVertex(-2.29, 14.28, -2.29, 27.39, 6.2, 35.48);
-  vertex(20.84, 50.12);
-  vertex(50.13, 79.41);
-  vertex(79.42, 50.12);
-  vertex(94.06, 35.48);
-  bezierVertex(102.15, 27.39, 102.15, 14.28, 94.06, 6.19);
-  bezierVertex(85.97, -1.9, 72.86, -1.9, 64.77, 6.19);
-  endShape(CLOSE);
+  c.noFill();
+  c.beginShape();
+  c.vertex(64.77, 6.19);
+  c.vertex(50.13, 20.83);
+  c.vertex(35.49, 6.19);
+  c.bezierVertex(27.4, -1.9, 14.29, -1.9, 6.2, 6.19);
+  c.bezierVertex(-2.29, 14.28, -2.29, 27.39, 6.2, 35.48);
+  c.vertex(20.84, 50.12);
+  c.vertex(50.13, 79.41);
+  c.vertex(79.42, 50.12);
+  c.vertex(94.06, 35.48);
+  c.bezierVertex(102.15, 27.39, 102.15, 14.28, 94.06, 6.19);
+  c.bezierVertex(85.97, -1.9, 72.86, -1.9, 64.77, 6.19);
+  c.endShape(c.CLOSE);
 
-  pop();
+  c.pop();
 }
 
 // ===================================================================
 // SETUP E CICLO PRINCIPALE
 // ===================================================================
-
 function setup() {
   const canvasContainer = document.getElementById("canvas-container");
-  // --- MODIFICA CHIAVE ---
-  // Il canvas ora si adatta al suo contenitore HTML.
   const canvas = createCanvas(
     canvasContainer.clientWidth,
     canvasContainer.clientHeight
@@ -105,6 +108,13 @@ function setup() {
 
   pixelDensity(1);
   frameRate(60);
+
+  // Layer per tutte le onde
+  waveLayer = createGraphics(width, height);
+  if (config.saveBackground) waveLayer.background(pal.bg);
+  else waveLayer.clear();
+  waveLayer.noFill();
+  waveLayer.strokeCap(SQUARE);
 
   initializeUI();
   updateUIFromState();
@@ -115,18 +125,13 @@ function draw() {
   t += dt;
 
   background(pal.bg);
-  noFill();
-
-  push();
-  clip(() => {
-    rect(0, 0, width, height);
-  });
+  image(waveLayer, 0, 0);
 
   stats.wavesDrawn = 0;
   for (let i = sources.length - 1; i >= 0; i--) {
     const src = sources[i];
     src.update(dt);
-    stats.wavesDrawn += src.draw();
+    stats.wavesDrawn += src.drawWaveLayer(waveLayer);
 
     if (!src.isAlive()) {
       src.destroy();
@@ -134,32 +139,26 @@ function draw() {
     }
   }
 
-  pop();
   updateStats();
 }
 
 // --- NUOVA FUNZIONE PER IL RESIZE ---
-// Questa funzione viene chiamata da p5.js ogni volta che la finestra cambia dimensione.
 function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
   const formatSelect = document.getElementById("format-select");
 
   resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
+  waveLayer.resizeCanvas(width, height);
+  if (config.saveBackground) waveLayer.background(pal.bg);
+  else waveLayer.clear();
 
-  // Se il canvas viene ridimensionato con la finestra,
-  // assicuriamoci che il menu mostri "Superficie di Visualizzazione".
   formatSelect.value = "viewport";
 }
 
 // ===================================================================
 // GESTIONE UI
 // ===================================================================
-// ===================================================================
-// GESTIONE UI
-// ===================================================================
-
 function initializeUI() {
-  // ... (la prima parte di initializeUI rimane invariata) ...
   document.querySelectorAll(".panel-header").forEach((header) => {
     header.addEventListener("click", () => {
       header.classList.toggle("active");
@@ -217,29 +216,23 @@ function initializeUI() {
   const customHeightInput = document.getElementById("custom-height");
 
   formatSelect.addEventListener("change", () => {
-    if (formatSelect.value === "custom") {
+    if (formatSelect.value === "custom")
       customInputs.classList.remove("hidden");
-    } else {
-      customInputs.classList.add("hidden");
-    }
+    else customInputs.classList.add("hidden");
   });
 
-  // --- LOGICA DEL PULSANTE "APPLICA FORMATO" MODIFICATA ---
   applyFormatBtn.addEventListener("click", () => {
     let newWidth, newHeight;
     const selectedValue = formatSelect.value;
     const canvasContainer = document.getElementById("canvas-container");
 
     if (selectedValue === "viewport") {
-      // Se si sceglie "Superficie di Visualizzazione"
       newWidth = canvasContainer.clientWidth;
       newHeight = canvasContainer.clientHeight;
     } else if (selectedValue === "custom") {
-      // Se si sceglie il formato personalizzato
       newWidth = customWidthInput.value;
       newHeight = customHeightInput.value;
     } else {
-      // Per tutti gli altri formati predefiniti
       [newWidth, newHeight] = selectedValue.split("x");
     }
     resizeCanvasAndContent(newWidth, newHeight);
@@ -285,17 +278,13 @@ function updateStats() {
 // ===================================================================
 // GESTIONE EVENTI (Mouse e Tastiera)
 // ===================================================================
-
 function mousePressed(event) {
   const sidebar = document.getElementById("ui-sidebar");
-  if (event.target.closest("#ui-sidebar")) {
-    return;
-  }
+  if (event.target.closest("#ui-sidebar")) return;
 
   if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
-    if (sources.length < config.maxSources) {
+    if (sources.length < config.maxSources)
       sources.unshift(new WaveSource(mouseX, mouseY));
-    }
   }
 }
 
@@ -310,7 +299,6 @@ function keyPressed() {
 // ===================================================================
 // AZIONI PRINCIPALI
 // ===================================================================
-
 function togglePause() {
   paused = !paused;
   updateUIFromState();
@@ -327,33 +315,44 @@ function resetSimulation() {
   paused = false;
   Object.assign(config, defaultConfig);
   Object.assign(pal, defaultPal);
+  if (config.saveBackground) waveLayer.background(pal.bg);
+  else waveLayer.clear();
   updateUIFromState();
 }
 
 function resizeCanvasAndContent(w, h) {
   const newWidth = parseInt(w, 10);
   const newHeight = parseInt(h, 10);
-
   if (isNaN(newWidth) || isNaN(newHeight) || newWidth <= 0 || newHeight <= 0) {
     alert("Per favore, inserisci dimensioni valide.");
     return;
   }
   resizeCanvas(newWidth, newHeight);
+  waveLayer.resizeCanvas(newWidth, newHeight);
+  if (config.saveBackground) waveLayer.background(pal.bg);
+  else waveLayer.clear();
   clearSources();
-  background(pal.bg);
 }
 
+// ===================================================================
+// FUNZIONE DI SALVATAGGIO CORRETTA
+// ===================================================================
 function saveWaves() {
+  // Creiamo un canvas temporaneo con trasparenza
   const tempCanvas = createGraphics(width, height);
+  tempCanvas.clear(); // Canvas trasparente di default
+
+  // Se saveBackground è true, impostiamo lo sfondo
   if (config.saveBackground) {
     tempCanvas.background(pal.bg);
-  } else {
-    tempCanvas.clear();
   }
-  tempCanvas.noFill();
-  for (let src of sources) {
-    drawWaveOnCanvas(src, tempCanvas);
+
+  // Disegniamo tutte le onde sul canvas temporaneo
+  for (const src of sources) {
+    src.drawWaveLayer(tempCanvas);
   }
+
+  // Salviamo il PNG
   tempCanvas.save("onde.png");
   tempCanvas.remove();
 }
@@ -361,66 +360,6 @@ function saveWaves() {
 // ===================================================================
 // CLASSE WaveSource E LOGICA DI DISEGNO
 // ===================================================================
-
-function drawWaveOnCanvas(src, c) {
-  const maxR = Math.hypot(c.width, c.height);
-  const drawWave = (
-    imgSources,
-    speed,
-    interval,
-    strokeW,
-    alphaBase,
-    color,
-    decayFactor
-  ) => {
-    c.strokeWeight(strokeW);
-    for (const s of imgSources) {
-      for (let i = 0; i < config.maxWaves; i++) {
-        const r = speed * (src.t - i * interval);
-        if (r < 0) continue;
-        if (r > maxR) break;
-        const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
-        if (alpha < config.alphaThreshold) continue;
-        const hexAlpha = Math.floor(alpha * 255)
-          .toString(16)
-          .padStart(2, "0");
-        c.stroke(`${color}${hexAlpha}`);
-        drawHeartShape(s.x, s.y, r * 2);
-      }
-    }
-  };
-  drawWave(
-    src.imageSources,
-    config.speedPrimary,
-    config.intervalPrimary,
-    config.strokePrimary,
-    config.alphaPrimary,
-    pal.stroke,
-    config.decayFactorPrimary
-  );
-  drawWave(
-    src.imageSources,
-    config.speedSecondary,
-    config.intervalSecondary,
-    config.strokeSecondary,
-    config.alphaSecondary,
-    pal.stroke2,
-    config.decayFactorSecondary
-  );
-}
-
-function calcAlpha(base, r, maxR, decayFactor) {
-  if (r <= 0) return 0;
-  const nR = r / maxR;
-  if (nR > 1) return 0;
-  return base * Math.pow(1 - nR, 2) * Math.exp(-r / (maxR * decayFactor));
-}
-
-function isCircleVisible(x, y, r) {
-  if (!config.enableClipping) return true;
-  return x + r >= 0 && x - r <= width && y + r >= 0 && y - r <= height;
-}
-
 class WaveSource {
   constructor(x, y) {
     this.pos = getPooledVector(x, y);
@@ -452,6 +391,31 @@ class WaveSource {
     this.t += dt;
   }
 
+  drawWaveLayer(c) {
+    let total = 0;
+    total += this.drawWave(
+      this.imageSources,
+      config.speedPrimary,
+      config.intervalPrimary,
+      config.strokePrimary,
+      config.alphaPrimary,
+      pal.stroke,
+      config.decayFactorPrimary,
+      c
+    );
+    total += this.drawWave(
+      this.imageSources,
+      config.speedSecondary,
+      config.intervalSecondary,
+      config.strokeSecondary,
+      config.alphaSecondary,
+      pal.stroke2,
+      config.decayFactorSecondary,
+      c
+    );
+    return total;
+  }
+
   drawWave(
     imgSources,
     speed,
@@ -459,11 +423,12 @@ class WaveSource {
     strokeW,
     alphaBase,
     color,
-    decayFactor
+    decayFactor,
+    c
   ) {
-    const maxR = Math.hypot(width, height);
+    const maxR = Math.hypot(c.width, c.height);
     let wavesDrawn = 0;
-    strokeWeight(strokeW);
+    c.strokeWeight(strokeW);
     for (const s of imgSources) {
       for (let i = 0; i < config.maxWaves; i++) {
         const r = speed * (this.t - i * interval);
@@ -475,35 +440,12 @@ class WaveSource {
         const hexAlpha = Math.floor(alpha * 255)
           .toString(16)
           .padStart(2, "0");
-        stroke(`${color}${hexAlpha}`);
-        drawHeartShape(s.x, s.y, r * 2);
+        c.stroke(`${color}${hexAlpha}`);
+        drawHeartShapeUniversal(c, s.x, s.y, r * 2);
         wavesDrawn++;
       }
     }
     return wavesDrawn;
-  }
-
-  draw() {
-    let total = 0;
-    total += this.drawWave(
-      this.imageSources,
-      config.speedPrimary,
-      config.intervalPrimary,
-      config.strokePrimary,
-      config.alphaPrimary,
-      pal.stroke,
-      config.decayFactorPrimary
-    );
-    total += this.drawWave(
-      this.imageSources,
-      config.speedSecondary,
-      config.intervalSecondary,
-      config.strokeSecondary,
-      config.alphaSecondary,
-      pal.stroke2,
-      config.decayFactorSecondary
-    );
-    return total;
   }
 
   isAlive() {
@@ -530,4 +472,19 @@ class WaveSource {
     this.imageSources.forEach((v) => returnToPool(v));
     this.imageSources = [];
   }
+}
+
+// ===================================================================
+// FUNZIONI AUSILIARIE
+// ===================================================================
+function calcAlpha(base, r, maxR, decayFactor) {
+  if (r <= 0) return 0;
+  const nR = r / maxR;
+  if (nR > 1) return 0;
+  return base * Math.pow(1 - nR, 2) * Math.exp(-r / (maxR * decayFactor));
+}
+
+function isCircleVisible(x, y, r) {
+  if (!config.enableClipping) return true;
+  return x + r >= 0 && x - r <= width && y + r >= 0 && y - r <= height;
 }
