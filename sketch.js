@@ -146,15 +146,6 @@ function draw() {
   background(pal.bg);
   image(waveLayer, 0, 0);
 
-  if (paused) {
-    fill(0, 0, 0, 150);
-    rect(0, 0, width, height);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(50);
-    text("PAUSA", width / 2, height / 2);
-  }
-
   updateStats();
 }
 
