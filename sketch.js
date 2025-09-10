@@ -449,7 +449,7 @@ class WaveSource {
       for (let i = 0; i < config.maxWaves; i++) {
         const r = speed * (this.t - i * interval);
         if (r < 0 || r > maxR) continue;
-        if (!isCircleVisible(s.pos.x, s.pos.y, r)) continue;
+        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2)) continue;
         const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
         if (alpha < config.alphaThreshold) continue;
         const hexAlpha = Math.floor(alpha * 255)
@@ -501,7 +501,13 @@ function calcAlpha(base, r, maxR, decayFactor) {
   return base * Math.pow(1 - nR, 2) * Math.exp(-r / (maxR * decayFactor));
 }
 
-function isCircleVisible(x, y, r) {
+function isHeartVisible(x, y, size) {
   if (!config.enableClipping) return true;
-  return x + r >= 0 && x - r <= width && y + r >= 0 && y - r <= height;
+  const halfSize = size / 2;
+  return (
+    x + halfSize >= 0 &&
+    x - halfSize <= width &&
+    y + halfSize >= 0 &&
+    y - halfSize <= height
+  );
 }
