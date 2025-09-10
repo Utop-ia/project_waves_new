@@ -108,17 +108,24 @@ function draw() {
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
 
-  // --- CORREZIONE 1: CONTEGGIO ONDE RIPRISTINATO ---
+  waveLayer.push();
+  waveLayer.clip(() => {
+    waveLayer.rect(0, 0, width, height);
+  });
+
+  // CORREZIONE 1: Conteggio onde ripristinato
   stats.wavesDrawn = 0;
   for (let i = sources.length - 1; i >= 0; i--) {
     const src = sources[i];
     src.update(dt);
-    stats.wavesDrawn += src.drawWaveLayer(waveLayer); // Ora il conteggio viene aggiornato
+    stats.wavesDrawn += src.drawWaveLayer(waveLayer); // Aggiorna il conteggio
     if (!src.isAlive()) {
       src.destroy();
       sources.splice(i, 1);
     }
   }
+
+  waveLayer.pop();
 
   background(pal.bg);
   image(waveLayer, 0, 0);
@@ -137,34 +144,25 @@ class WaveSource {
     this.calculateImageSources();
   }
 
+  // CORREZIONE: Logica di calcolo delle riflessioni ripristinata alla versione stabile
   calculateImageSources() {
     this.imageSources.forEach((s) => returnToPool(s.pos));
     this.imageSources = [];
     const r = config.maxReflections;
-
     for (let ix = -r; ix <= r; ix++) {
       for (let iy = -r; iy <= r; iy++) {
-        let sx = this.pos.x;
-        let sy = this.pos.y;
-        let flipX = 1;
-        let flipY = 1;
-
-        if (ix % 2 !== 0) {
-          sx = width - this.pos.x;
-          flipX = -1;
-        }
-        if (iy % 2 !== 0) {
-          sy = height - this.pos.y;
-          flipY = -1;
-        }
-
-        sx += ix * width;
-        sy += iy * height;
-
+        const sx =
+          ix % 2 === 0
+            ? this.pos.x + ix * width
+            : width - this.pos.x + ix * width;
+        const sy =
+          iy % 2 === 0
+            ? this.pos.y + iy * height
+            : height - this.pos.y + iy * height;
         this.imageSources.push({
           pos: getPooledVector(sx, sy),
-          scaleX: flipX,
-          scaleY: flipY,
+          scaleX: ix % 2 === 0 ? 1 : -1,
+          scaleY: iy % 2 === 0 ? 1 : -1,
         });
       }
     }
@@ -482,7 +480,6 @@ function windowResized() {
 // ===================================================================
 // Aggiornamento stats
 // ===================================================================
-// --- CORREZIONE 2: STATS AGGIORNATE CORRETTAMENTE ---
 function updateStats() {
   stats.fps = frameRate();
   stats.sourcesCount = sources.length;
