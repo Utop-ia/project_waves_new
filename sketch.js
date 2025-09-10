@@ -20,6 +20,7 @@ const config = {
   maxSources: 5,
   enableClipping: true,
   saveBackground: true,
+  waveDisplayMode: "both", // <-- MODIFICA 1: Aggiunto parametro
 };
 
 const pal = {
@@ -28,7 +29,7 @@ const pal = {
   stroke2: "#5bd44c",
 };
 
-const defaultConfig = { ...config };
+const defaultConfig = { ...config }; // <-- MODIFICA 2: Si aggiorna automaticamente
 const defaultPal = { ...pal };
 
 let t = 0;
@@ -274,28 +275,44 @@ class WaveSource {
     this.t += dt;
   }
 
+  // <-- MODIFICA 3: Logica di disegno aggiornata -->
   drawWaveLayer(c) {
     let total = 0;
-    total += this.drawWave(
-      this.imageSources,
-      config.speedPrimary,
-      config.intervalPrimary,
-      config.strokePrimary,
-      config.alphaPrimary,
-      pal.stroke,
-      config.decayFactorPrimary,
-      c
-    );
-    total += this.drawWave(
-      this.imageSources,
-      config.speedSecondary,
-      config.intervalSecondary,
-      config.strokeSecondary,
-      config.alphaSecondary,
-      pal.stroke2,
-      config.decayFactorSecondary,
-      c
-    );
+
+    // Disegna le onde primarie solo se la modalità è 'both' o 'primary'
+    if (
+      config.waveDisplayMode === "both" ||
+      config.waveDisplayMode === "primary"
+    ) {
+      total += this.drawWave(
+        this.imageSources,
+        config.speedPrimary,
+        config.intervalPrimary,
+        config.strokePrimary,
+        config.alphaPrimary,
+        pal.stroke,
+        config.decayFactorPrimary,
+        c
+      );
+    }
+
+    // Disegna le onde secondarie solo se la modalità è 'both' o 'secondary'
+    if (
+      config.waveDisplayMode === "both" ||
+      config.waveDisplayMode === "secondary"
+    ) {
+      total += this.drawWave(
+        this.imageSources,
+        config.speedSecondary,
+        config.intervalSecondary,
+        config.strokeSecondary,
+        config.alphaSecondary,
+        pal.stroke2,
+        config.decayFactorSecondary,
+        c
+      );
+    }
+
     return total;
   }
 
@@ -427,7 +444,14 @@ function initializeUI() {
     });
   });
 
-  // --- NUOVA LOGICA PRESET ---
+  // <-- MODIFICA 4: Aggiunta gestione UI per la visibilità -->
+  // GESTIONE VISIBILITÀ ONDE
+  const waveDisplaySelect = document.getElementById("wave-display-select");
+  waveDisplaySelect.addEventListener("change", () => {
+    config.waveDisplayMode = waveDisplaySelect.value;
+  });
+
+  // --- LOGICA PRESET ---
   const presetSelect = document.getElementById("preset-select");
   const applyPresetBtn = document.getElementById("apply-preset-btn");
 
@@ -514,6 +538,11 @@ function updateUIFromState() {
   });
   document.querySelector(".checkbox-group input").checked =
     config.saveBackground;
+
+  // <-- MODIFICA 5: Sincronizzazione UI per la visibilità -->
+  document.getElementById("wave-display-select").value =
+    config.waveDisplayMode || "both";
+
   document.getElementById("pause-btn").textContent = paused
     ? "Riprendi"
     : "Pausa";
