@@ -429,6 +429,7 @@ function initializeUI() {
 
   // --- NUOVA LOGICA PRESET ---
   const presetSelect = document.getElementById("preset-select");
+  const applyPresetBtn = document.getElementById("apply-preset-btn");
 
   // Popola il menu a tendina
   for (const name in brandPresets) {
@@ -438,8 +439,8 @@ function initializeUI() {
     presetSelect.appendChild(option);
   }
 
-  // Applica il preset quando viene selezionato
-  presetSelect.addEventListener("change", () => {
+  // Applica il preset solo quando il pulsante viene cliccato
+  applyPresetBtn.addEventListener("click", () => {
     const presetName = presetSelect.value;
     if (brandPresets[presetName]) {
       const preset = brandPresets[presetName];
@@ -448,7 +449,7 @@ function initializeUI() {
       if (preset.pal) {
         Object.assign(pal, preset.pal);
       }
-      updateUIFromState();
+      updateUIFromState(); // Aggiorna l'interfaccia con i nuovi valori
     }
   });
 
