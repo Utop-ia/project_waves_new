@@ -20,7 +20,9 @@ const config = {
   maxSources: 5,
   enableClipping: true,
   saveBackground: true,
-  waveDisplayMode: "both", // <-- MODIFICA 1: Aggiunto parametro
+  waveDisplayMode: "both",
+  zoomSelection: "1",
+  heartBaseSize: 1,
 };
 
 const pal = {
@@ -29,7 +31,7 @@ const pal = {
   stroke2: "#5bd44c",
 };
 
-const defaultConfig = { ...config }; // <-- MODIFICA 2: Si aggiorna automaticamente
+const defaultConfig = { ...config };
 const defaultPal = { ...pal };
 
 let t = 0;
@@ -202,6 +204,43 @@ function setup() {
 }
 
 // ===================================================================
+// Funzione Applica Zoom (NUOVA LOGICA)
+// ===================================================================
+function applyCanvasZoom() {
+  const canvasEl = document.querySelector("#canvas-container canvas");
+  if (!canvasEl) return;
+
+  const zoomValue = document.getElementById("zoom-select").value;
+  config.zoomSelection = zoomValue; // Salva la selezione corrente
+
+  if (zoomValue === "fit") {
+    const container = document.getElementById("canvas-container");
+    const containerW = container.clientWidth - 40; // Sottrae padding
+    const containerH = container.clientHeight - 40; // Sottrae padding
+
+    const canvasAspectRatio = width / height;
+    const containerAspectRatio = containerW / containerH;
+
+    let newWidth, newHeight;
+
+    if (canvasAspectRatio > containerAspectRatio) {
+      newWidth = containerW;
+      newHeight = containerW / canvasAspectRatio;
+    } else {
+      newHeight = containerH;
+      newWidth = containerH * canvasAspectRatio;
+    }
+
+    canvasEl.style.width = newWidth + "px";
+    canvasEl.style.height = newHeight + "px";
+  } else {
+    const zoomFactor = Number(zoomValue);
+    canvasEl.style.width = width * zoomFactor + "px";
+    canvasEl.style.height = height * zoomFactor + "px";
+  }
+}
+
+// ===================================================================
 // Ciclo draw
 // ===================================================================
 function draw() {
@@ -211,17 +250,18 @@ function draw() {
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
 
+  // RIMOSSA la logica di zoom digitale da qui
+
   waveLayer.push();
   waveLayer.clip(() => {
     waveLayer.rect(0, 0, width, height);
   });
 
-  // CORREZIONE 1: Conteggio onde ripristinato
   stats.wavesDrawn = 0;
   for (let i = sources.length - 1; i >= 0; i--) {
     const src = sources[i];
     src.update(dt);
-    stats.wavesDrawn += src.drawWaveLayer(waveLayer); // Aggiorna il conteggio
+    stats.wavesDrawn += src.drawWaveLayer(waveLayer);
     if (!src.isAlive()) {
       src.destroy();
       sources.splice(i, 1);
@@ -247,7 +287,6 @@ class WaveSource {
     this.calculateImageSources();
   }
 
-  // CORREZIONE: Logica di calcolo delle riflessioni ripristinata alla versione stabile
   calculateImageSources() {
     this.imageSources.forEach((s) => returnToPool(s.pos));
     this.imageSources = [];
@@ -275,11 +314,9 @@ class WaveSource {
     this.t += dt;
   }
 
-  // <-- MODIFICA 3: Logica di disegno aggiornata -->
   drawWaveLayer(c) {
     let total = 0;
 
-    // Disegna le onde primarie solo se la modalità è 'both' o 'primary'
     if (
       config.waveDisplayMode === "both" ||
       config.waveDisplayMode === "primary"
@@ -296,7 +333,6 @@ class WaveSource {
       );
     }
 
-    // Disegna le onde secondarie solo se la modalità è 'both' o 'secondary'
     if (
       config.waveDisplayMode === "both" ||
       config.waveDisplayMode === "secondary"
@@ -332,7 +368,8 @@ class WaveSource {
       for (let i = 0; i < config.maxWaves; i++) {
         const r = speed * (this.t - i * interval);
         if (r < 0 || r > maxR) continue;
-        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2)) continue;
+        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2 * config.heartBaseSize))
+          continue;
         const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
         if (alpha < config.alphaThreshold) continue;
         const hexAlpha = Math.floor(alpha * 255)
@@ -342,7 +379,8 @@ class WaveSource {
         c.push();
         c.translate(s.pos.x, s.pos.y);
         c.scale(s.scaleX, s.scaleY);
-        drawHeartShapeUniversal(c, 0, 0, r * 2);
+        // MODIFICATO per usare la dimensione del cuore
+        drawHeartShapeUniversal(c, 0, 0, r * 2 * config.heartBaseSize);
         c.pop();
         wavesDrawn++;
       }
@@ -444,12 +482,15 @@ function initializeUI() {
     });
   });
 
-  // <-- MODIFICA 4: Aggiunta gestione UI per la visibilità -->
   // GESTIONE VISIBILITÀ ONDE
   const waveDisplaySelect = document.getElementById("wave-display-select");
   waveDisplaySelect.addEventListener("change", () => {
     config.waveDisplayMode = waveDisplaySelect.value;
   });
+
+  // GESTIONE ZOOM CON PULSANTE
+  const applyZoomBtn = document.getElementById("apply-zoom-btn");
+  applyZoomBtn.addEventListener("click", applyCanvasZoom);
 
   // --- LOGICA PRESET ---
   const presetSelect = document.getElementById("preset-select");
@@ -468,12 +509,11 @@ function initializeUI() {
     const presetName = presetSelect.value;
     if (brandPresets[presetName]) {
       const preset = brandPresets[presetName];
-      // Copia profonda per evitare problemi
       Object.assign(config, JSON.parse(JSON.stringify(preset.config)));
       if (preset.pal) {
         Object.assign(pal, preset.pal);
       }
-      updateUIFromState(); // Aggiorna l'interfaccia con i nuovi valori
+      updateUIFromState();
     }
   });
 
@@ -539,9 +579,10 @@ function updateUIFromState() {
   document.querySelector(".checkbox-group input").checked =
     config.saveBackground;
 
-  // <-- MODIFICA 5: Sincronizzazione UI per la visibilità -->
   document.getElementById("wave-display-select").value =
     config.waveDisplayMode || "both";
+
+  document.getElementById("zoom-select").value = config.zoomSelection || "1";
 
   document.getElementById("pause-btn").textContent = paused
     ? "Riprendi"
@@ -552,9 +593,14 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
-    if (sources.length < config.maxSources)
-      sources.unshift(new WaveSource(mouseX, mouseY));
+  // Controlla che l'elemento cliccato sia il canvas di p5.js
+  // (p5 aggiunge di default la classe 'p5Canvas' all'elemento canvas)
+  if (event.target.classList.contains("p5Canvas")) {
+    // Ora esegue la logica precedente solo se il target è corretto
+    if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+      if (sources.length < config.maxSources)
+        sources.unshift(new WaveSource(mouseX, mouseY));
+    }
   }
 }
 
@@ -581,14 +627,31 @@ function clearSources() {
   else waveLayer.clear();
 }
 
+// ============== FUNZIONE MODIFICATA ==============
 function resetSimulation() {
+  // 1. Pulisce le onde e resetta il tempo/pausa
   clearSources();
   t = 0;
   paused = false;
+
+  // 2. Resetta tutti i parametri degli oggetti config e pal ai valori di default
   Object.assign(config, defaultConfig);
   Object.assign(pal, defaultPal);
-  if (config.saveBackground) waveLayer.background(pal.bg);
-  else waveLayer.clear();
+
+  // 3. Resetta il FORMATO del canvas allo stato iniziale ("Superficie di Visualizzazione")
+  document.getElementById("format-select").value = "viewport";
+  document.getElementById("custom-format-inputs").classList.add("hidden"); // Nasconde input custom
+  const canvasContainer = document.getElementById("canvas-container");
+  resizeCanvasAndContent(
+    canvasContainer.clientWidth,
+    canvasContainer.clientHeight
+  );
+
+  // 4. Resetta lo ZOOM del canvas a 100%
+  // Nota: resizeCanvasAndContent() chiama già applyCanvasZoom(),
+  // quindi lo zoom si resetterà automaticamente perché config.zoomSelection è stato riportato a '1'
+
+  // 5. Aggiorna l'intera UI per riflettere i parametri resettati
   updateUIFromState();
 }
 
@@ -603,12 +666,16 @@ function resizeCanvasAndContent(w, h) {
   waveLayer.resizeCanvas(newWidth, newHeight);
   maxR = Math.hypot(width, height);
   sources.forEach((src) => src.calculateImageSources());
+
+  // Applica lo zoom corrente al nuovo formato
+  applyCanvasZoom();
 }
 
 // ===================================================================
 // Funzione salvataggio PNG
 // ===================================================================
 function saveWaves() {
+  // Ora il salvataggio non richiede lo zoom, salva l'immagine alla sua risoluzione nativa
   const tempCanvas = createGraphics(width, height);
   if (config.saveBackground) tempCanvas.background(pal.bg);
   else tempCanvas.clear();
@@ -627,10 +694,15 @@ function saveWaves() {
 // ===================================================================
 function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
-  resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
-  waveLayer.resizeCanvas(width, height);
-  maxR = Math.hypot(width, height);
-  sources.forEach((src) => src.calculateImageSources());
+  // Se la modalità è viewport, ridimensiona il canvas di p5
+  if (document.getElementById("format-select").value === "viewport") {
+    resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
+    waveLayer.resizeCanvas(width, height);
+    maxR = Math.hypot(width, height);
+    sources.forEach((src) => src.calculateImageSources());
+  }
+  // Applica sempre lo zoom per adattare alla nuova dimensione della finestra
+  applyCanvasZoom();
 }
 
 // ===================================================================
