@@ -51,6 +51,108 @@ const returnToPool = (v) => {
 };
 
 // ===================================================================
+// PRESET DEGLI STATI DEL BRAND
+// ===================================================================
+const brandPresets = {
+  "Flusso Armonico (Default)": {
+    config: {
+      speedPrimary: 50,
+      intervalPrimary: 0.4,
+      strokePrimary: 50,
+      alphaPrimary: 0.8,
+      decayFactorPrimary: 2.0,
+      speedSecondary: 50,
+      intervalSecondary: 0.4,
+      strokeSecondary: 25,
+      alphaSecondary: 0.8,
+      decayFactorSecondary: 2.0,
+      maxWaves: 3,
+      maxReflections: 2,
+    },
+  },
+  "Eco Vitale": {
+    config: {
+      speedPrimary: 120,
+      intervalPrimary: 0.1,
+      strokePrimary: 40,
+      alphaPrimary: 0.9,
+      decayFactorPrimary: 0.8,
+      speedSecondary: 120,
+      intervalSecondary: 0.1,
+      strokeSecondary: 15,
+      alphaSecondary: 0.9,
+      decayFactorSecondary: 0.8,
+      maxWaves: 5,
+      maxReflections: 1,
+    },
+  },
+  "Trama Storica": {
+    config: {
+      speedPrimary: 20,
+      intervalPrimary: 0.8,
+      strokePrimary: 60,
+      alphaPrimary: 0.4,
+      decayFactorPrimary: 3.0,
+      speedSecondary: 20,
+      intervalSecondary: 0.8,
+      strokeSecondary: 30,
+      alphaSecondary: 0.4,
+      decayFactorSecondary: 3.0,
+      maxWaves: 10,
+      maxReflections: 4,
+    },
+  },
+  "Sapore Pieno": {
+    config: {
+      speedPrimary: 40,
+      intervalPrimary: 0.4,
+      strokePrimary: 120,
+      alphaPrimary: 0.85,
+      decayFactorPrimary: 2.5,
+      speedSecondary: 40,
+      intervalSecondary: 0.4,
+      strokeSecondary: 60,
+      alphaSecondary: 0.85,
+      decayFactorSecondary: 2.5,
+      maxWaves: 5,
+      maxReflections: 2,
+    },
+  },
+  "Respiro Calmo": {
+    config: {
+      speedPrimary: 15,
+      intervalPrimary: 1.5,
+      strokePrimary: 10,
+      alphaPrimary: 0.2,
+      decayFactorPrimary: 4.0,
+      speedSecondary: 15,
+      intervalSecondary: 1.5,
+      strokeSecondary: 5,
+      alphaSecondary: 0.2,
+      decayFactorSecondary: 4.0,
+      maxWaves: 5,
+      maxReflections: 1,
+    },
+  },
+  "Gesto Creativo": {
+    config: {
+      speedPrimary: 80,
+      intervalPrimary: 0.15,
+      strokePrimary: 10,
+      alphaPrimary: 0.9,
+      decayFactorPrimary: 1.5,
+      speedSecondary: 25,
+      intervalSecondary: 0.6,
+      strokeSecondary: 90,
+      alphaSecondary: 0.7,
+      decayFactorSecondary: 2.5,
+      maxWaves: 7,
+      maxReflections: 3,
+    },
+  },
+};
+
+// ===================================================================
 // Disegna il cuore
 // ===================================================================
 function drawHeartShapeUniversal(c, x, y, size) {
@@ -277,7 +379,7 @@ function isHeartVisible(x, y, size) {
 }
 
 // ===================================================================
-// Gestione UI
+// GESTIONE UI
 // ===================================================================
 function initializeUI() {
   document.querySelectorAll(".panel-header").forEach((header) => {
@@ -325,10 +427,34 @@ function initializeUI() {
     });
   });
 
+  // --- NUOVA LOGICA PRESET ---
+  const presetSelect = document.getElementById("preset-select");
+
+  // Popola il menu a tendina
+  for (const name in brandPresets) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    presetSelect.appendChild(option);
+  }
+
+  // Applica il preset quando viene selezionato
+  presetSelect.addEventListener("change", () => {
+    const presetName = presetSelect.value;
+    if (brandPresets[presetName]) {
+      const preset = brandPresets[presetName];
+      // Copia profonda per evitare problemi
+      Object.assign(config, JSON.parse(JSON.stringify(preset.config)));
+      if (preset.pal) {
+        Object.assign(pal, preset.pal);
+      }
+      updateUIFromState();
+    }
+  });
+
   document
     .getElementById("save-waves-btn")
     .addEventListener("click", saveWaves);
-
   document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", clearSources);
   document

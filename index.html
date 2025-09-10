@@ -18,6 +18,16 @@
         </header>
 
         <div class="ui-panel">
+          <h2 class="panel-header">Preset</h2>
+          <div class="panel-content show">
+            <div class="preset-group">
+              <label for="preset-select">Seleziona uno stato</label>
+              <select id="preset-select"></select>
+            </div>
+          </div>
+        </div>
+
+        <div class="ui-panel">
           <h2 class="panel-header">Formati Canvas</h2>
           <div class="panel-content">
             <div class="preset-group">
@@ -260,62 +270,6 @@
                   max="5"
                   step="0.1"
                   value="1.5"
-                  class="value-input"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="ui-panel">
-          <h2 class="panel-header">Simulazione</h2>
-          <div class="panel-content">
-            <div class="slider-group" data-key="maxWaves" data-target="config">
-              <label>Numero Fronti Onda</label>
-              <div class="slider-input-wrapper">
-                <input type="range" min="1" max="20" step="1" value="5" />
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  step="1"
-                  value="5"
-                  class="value-input"
-                />
-              </div>
-            </div>
-            <div
-              class="slider-group"
-              data-key="maxReflections"
-              data-target="config"
-            >
-              <label>Riflessioni</label>
-              <div class="slider-input-wrapper">
-                <input type="range" min="0" max="5" step="1" value="2" />
-                <input
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="1"
-                  value="2"
-                  class="value-input"
-                />
-              </div>
-            </div>
-            <div
-              class="slider-group"
-              data-key="maxSources"
-              data-target="config"
-            >
-              <label>Sorgenti</label>
-              <div class="slider-input-wrapper">
-                <input type="range" min="1" max="200" step="1" value="50" />
-                <input
-                  type="number"
-                  min="1"
-                  max="200"
-                  step="1"
-                  value="50"
                   class="value-input"
                 />
               </div>
