@@ -1,22 +1,19 @@
 // ---------------------
-// Parametri Principali (Configurazione Iniziale)
+// Parametri Principali
 // ---------------------
 const config = {
-  // --- ONDE PRIMARIE ---
   speedPrimary: 30,
   intervalPrimary: 0.3,
   strokePrimary: 80,
   alphaPrimary: 0.8,
   decayFactorPrimary: 1.5,
 
-  // --- ONDE SECONDARIE ---
   speedSecondary: 30,
   intervalSecondary: 0.2,
   strokeSecondary: 20,
   alphaSecondary: 0.8,
   decayFactorSecondary: 1.5,
 
-  // --- IMPOSTAZIONI GENERALI ---
   maxWaves: 5,
   maxReflections: 2,
   alphaThreshold: 0.005,
@@ -31,22 +28,15 @@ const pal = {
   stroke2: "#5bd44c",
 };
 
-// Salviamo i default per il reset
 const defaultConfig = { ...config };
 const defaultPal = { ...pal };
 
-// ---------------------
-// Stato e Metriche
-// ---------------------
 let t = 0;
 let paused = false;
 let sources = [];
 const stats = { fps: 0, sourcesCount: 0, wavesDrawn: 0 };
 let maxR;
-
-// ---------------------
-// Pool di Vettori per Ottimizzazione
-// ---------------------
+let waveLayer;
 const vectorPool = [];
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
@@ -60,13 +50,8 @@ const returnToPool = (v) => {
   if (vectorPool.length < 500) vectorPool.push(v);
 };
 
-// ---------------------
-// Layer off-screen per onde
-// ---------------------
-let waveLayer;
-
 // ===================================================================
-// FUNZIONE PER DISEGNARE IL CUORE
+// Disegna il cuore
 // ===================================================================
 function drawHeartShapeUniversal(c, x, y, size) {
   c.push();
@@ -91,7 +76,7 @@ function drawHeartShapeUniversal(c, x, y, size) {
 }
 
 // ===================================================================
-// SETUP E CICLO PRINCIPALE
+// Setup
 // ===================================================================
 function setup() {
   const canvasContainer = document.getElementById("canvas-container");
@@ -103,7 +88,6 @@ function setup() {
 
   pixelDensity(1);
   frameRate(60);
-
   maxR = Math.hypot(width, height);
 
   waveLayer = createGraphics(width, height);
@@ -114,6 +98,9 @@ function setup() {
   updateUIFromState();
 }
 
+// ===================================================================
+// Ciclo draw
+// ===================================================================
 function draw() {
   const dt = paused ? 0 : deltaTime / 1000;
   t += dt;
@@ -121,53 +108,178 @@ function draw() {
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
 
-  waveLayer.push();
-  waveLayer.clip(() => {
-    waveLayer.rect(0, 0, width, height);
-  });
-
+  // --- CORREZIONE 1: CONTEGGIO ONDE RIPRISTINATO ---
+  stats.wavesDrawn = 0;
   for (let i = sources.length - 1; i >= 0; i--) {
     const src = sources[i];
     src.update(dt);
-    src.drawWaveLayer(waveLayer);
+    stats.wavesDrawn += src.drawWaveLayer(waveLayer); // Ora il conteggio viene aggiornato
     if (!src.isAlive()) {
       src.destroy();
       sources.splice(i, 1);
     }
   }
 
-  waveLayer.pop();
-
   background(pal.bg);
   image(waveLayer, 0, 0);
-
-  if (paused) {
-    fill(0, 0, 0, 150);
-    rect(0, 0, width, height);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(50);
-    text("PAUSA", width / 2, height / 2);
-  }
 
   updateStats();
 }
 
-function windowResized() {
-  const canvasContainer = document.getElementById("canvas-container");
-  const formatSelect = document.getElementById("format-select");
-  resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
+// ===================================================================
+// WaveSource con riflessioni speculari corrette
+// ===================================================================
+class WaveSource {
+  constructor(x, y) {
+    this.pos = getPooledVector(x, y);
+    this.t = 0;
+    this.imageSources = [];
+    this.calculateImageSources();
+  }
 
-  maxR = Math.hypot(width, height);
+  calculateImageSources() {
+    this.imageSources.forEach((s) => returnToPool(s.pos));
+    this.imageSources = [];
+    const r = config.maxReflections;
 
-  waveLayer.resizeCanvas(width, height);
-  if (config.saveBackground) waveLayer.background(pal.bg);
-  else waveLayer.clear();
-  formatSelect.value = "viewport";
+    for (let ix = -r; ix <= r; ix++) {
+      for (let iy = -r; iy <= r; iy++) {
+        let sx = this.pos.x;
+        let sy = this.pos.y;
+        let flipX = 1;
+        let flipY = 1;
+
+        if (ix % 2 !== 0) {
+          sx = width - this.pos.x;
+          flipX = -1;
+        }
+        if (iy % 2 !== 0) {
+          sy = height - this.pos.y;
+          flipY = -1;
+        }
+
+        sx += ix * width;
+        sy += iy * height;
+
+        this.imageSources.push({
+          pos: getPooledVector(sx, sy),
+          scaleX: flipX,
+          scaleY: flipY,
+        });
+      }
+    }
+  }
+
+  update(dt) {
+    this.t += dt;
+  }
+
+  drawWaveLayer(c) {
+    let total = 0;
+    total += this.drawWave(
+      this.imageSources,
+      config.speedPrimary,
+      config.intervalPrimary,
+      config.strokePrimary,
+      config.alphaPrimary,
+      pal.stroke,
+      config.decayFactorPrimary,
+      c
+    );
+    total += this.drawWave(
+      this.imageSources,
+      config.speedSecondary,
+      config.intervalSecondary,
+      config.strokeSecondary,
+      config.alphaSecondary,
+      pal.stroke2,
+      config.decayFactorSecondary,
+      c
+    );
+    return total;
+  }
+
+  drawWave(
+    imgSources,
+    speed,
+    interval,
+    strokeW,
+    alphaBase,
+    color,
+    decayFactor,
+    c
+  ) {
+    let wavesDrawn = 0;
+    c.strokeWeight(strokeW);
+    for (const s of imgSources) {
+      for (let i = 0; i < config.maxWaves; i++) {
+        const r = speed * (this.t - i * interval);
+        if (r < 0 || r > maxR) continue;
+        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2)) continue;
+        const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
+        if (alpha < config.alphaThreshold) continue;
+        const hexAlpha = Math.floor(alpha * 255)
+          .toString(16)
+          .padStart(2, "0");
+        c.stroke(`${color}${hexAlpha}`);
+        c.push();
+        c.translate(s.pos.x, s.pos.y);
+        c.scale(s.scaleX, s.scaleY);
+        drawHeartShapeUniversal(c, 0, 0, r * 2);
+        c.pop();
+        wavesDrawn++;
+      }
+    }
+    return wavesDrawn;
+  }
+
+  isAlive() {
+    const oldestWaveTime =
+      this.t -
+      (config.maxWaves - 1) *
+        Math.max(config.intervalPrimary, config.intervalSecondary);
+    if (oldestWaveTime < 0) return true;
+    const r_max =
+      Math.max(config.speedPrimary, config.speedSecondary) * oldestWaveTime;
+    return (
+      calcAlpha(
+        1.0,
+        r_max,
+        maxR,
+        Math.max(config.decayFactorPrimary, config.decayFactorSecondary)
+      ) > config.alphaThreshold
+    );
+  }
+
+  destroy() {
+    this.imageSources.forEach((s) => returnToPool(s.pos));
+    this.imageSources = [];
+  }
 }
 
 // ===================================================================
-// GESTIONE UI
+// Funzioni di supporto
+// ===================================================================
+function calcAlpha(base, r, maxR, decayFactor) {
+  if (r <= 0) return 0;
+  const nR = r / maxR;
+  if (nR > 1) return 0;
+  return base * Math.pow(1 - nR, 2) * Math.exp(-r / (maxR * decayFactor));
+}
+
+function isHeartVisible(x, y, size) {
+  if (!config.enableClipping) return true;
+  const halfSize = size / 2;
+  return (
+    x + halfSize >= 0 &&
+    x - halfSize <= width &&
+    y + halfSize >= 0 &&
+    y - halfSize <= height
+  );
+}
+
+// ===================================================================
+// Gestione UI
 // ===================================================================
 function initializeUI() {
   document.querySelectorAll(".panel-header").forEach((header) => {
@@ -282,23 +394,10 @@ function updateUIFromState() {
     : "Pausa";
 }
 
-function updateStats() {
-  stats.fps = frameRate();
-  stats.sourcesCount = sources.length;
-  const statsDisplay = document.getElementById("stats-display");
-  if (statsDisplay) {
-    statsDisplay.children[0].textContent = `FPS: ${stats.fps.toFixed(1)}`;
-    statsDisplay.children[1].textContent = `Sorgenti: ${stats.sourcesCount}`;
-    statsDisplay.children[2].textContent = `Onde: ${stats.wavesDrawn}`;
-  }
-}
-
 // ===================================================================
-// GESTIONE EVENTI
+// Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  const sidebar = document.getElementById("ui-sidebar");
-  if (event.target.closest("#ui-sidebar")) return;
   if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
     if (sources.length < config.maxSources)
       sources.unshift(new WaveSource(mouseX, mouseY));
@@ -314,7 +413,7 @@ function keyPressed() {
 }
 
 // ===================================================================
-// AZIONI PRINCIPALI
+// Azioni principali
 // ===================================================================
 function togglePause() {
   paused = !paused;
@@ -348,13 +447,12 @@ function resizeCanvasAndContent(w, h) {
   }
   resizeCanvas(newWidth, newHeight);
   waveLayer.resizeCanvas(newWidth, newHeight);
-  if (config.saveBackground) waveLayer.background(pal.bg);
-  else waveLayer.clear();
-  clearSources();
+  maxR = Math.hypot(width, height);
+  sources.forEach((src) => src.calculateImageSources());
 }
 
 // ===================================================================
-// FUNZIONE SALVATAGGIO PNG
+// Funzione salvataggio PNG
 // ===================================================================
 function saveWaves() {
   const tempCanvas = createGraphics(width, height);
@@ -371,143 +469,27 @@ function saveWaves() {
 }
 
 // ===================================================================
-// CLASSE WaveSource
+// Resize finestra
 // ===================================================================
-class WaveSource {
-  constructor(x, y) {
-    this.pos = getPooledVector(x, y);
-    this.t = 0;
-    this.imageSources = [];
-    this.calculateImageSources();
-  }
-
-  calculateImageSources() {
-    this.imageSources.forEach((s) => returnToPool(s.pos));
-    this.imageSources = [];
-    const r = config.maxReflections;
-    for (let ix = -r; ix <= r; ix++) {
-      for (let iy = -r; iy <= r; iy++) {
-        const sx =
-          ix % 2 === 0
-            ? this.pos.x + ix * width
-            : width - this.pos.x + ix * width;
-        const sy =
-          iy % 2 === 0
-            ? this.pos.y + iy * height
-            : height - this.pos.y + iy * height;
-        this.imageSources.push({
-          pos: getPooledVector(sx, sy),
-          scaleX: ix % 2 === 0 ? 1 : -1,
-          scaleY: iy % 2 === 0 ? 1 : -1,
-        });
-      }
-    }
-  }
-
-  update(dt) {
-    this.t += dt;
-  }
-
-  drawWaveLayer(c) {
-    let total = 0;
-    total += this.drawWave(
-      this.imageSources,
-      config.speedPrimary,
-      config.intervalPrimary,
-      config.strokePrimary,
-      config.alphaPrimary,
-      pal.stroke,
-      config.decayFactorPrimary,
-      c
-    );
-    total += this.drawWave(
-      this.imageSources,
-      config.speedSecondary,
-      config.intervalSecondary,
-      config.strokeSecondary,
-      config.alphaSecondary,
-      pal.stroke2,
-      config.decayFactorSecondary,
-      c
-    );
-    return total;
-  }
-
-  drawWave(
-    imgSources,
-    speed,
-    interval,
-    strokeW,
-    alphaBase,
-    color,
-    decayFactor,
-    c
-  ) {
-    let wavesDrawn = 0;
-    c.strokeWeight(strokeW);
-    for (const s of imgSources) {
-      for (let i = 0; i < config.maxWaves; i++) {
-        const r = speed * (this.t - i * interval);
-        if (r < 0 || r > maxR) continue;
-        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2)) continue;
-        const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
-        if (alpha < config.alphaThreshold) continue;
-        const hexAlpha = Math.floor(alpha * 255)
-          .toString(16)
-          .padStart(2, "0");
-        c.stroke(`${color}${hexAlpha}`);
-        c.push();
-        c.translate(s.pos.x, s.pos.y);
-        c.scale(s.scaleX, s.scaleY);
-        drawHeartShapeUniversal(c, 0, 0, r * 2);
-        c.pop();
-        wavesDrawn++;
-      }
-    }
-    return wavesDrawn;
-  }
-
-  isAlive() {
-    const oldestWaveTime =
-      this.t -
-      (config.maxWaves - 1) *
-        Math.max(config.intervalPrimary, config.intervalSecondary);
-    if (oldestWaveTime < 0) return true;
-    const r_max =
-      Math.max(config.speedPrimary, config.speedSecondary) * oldestWaveTime;
-    return (
-      calcAlpha(
-        1.0,
-        r_max,
-        maxR,
-        Math.max(config.decayFactorPrimary, config.decayFactorSecondary)
-      ) > config.alphaThreshold
-    );
-  }
-
-  destroy() {
-    this.imageSources.forEach((s) => returnToPool(s.pos));
-    this.imageSources = [];
-  }
+function windowResized() {
+  const canvasContainer = document.getElementById("canvas-container");
+  resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
+  waveLayer.resizeCanvas(width, height);
+  maxR = Math.hypot(width, height);
+  sources.forEach((src) => src.calculateImageSources());
 }
 
 // ===================================================================
-// FUNZIONI AUSILIARIE
+// Aggiornamento stats
 // ===================================================================
-function calcAlpha(base, r, maxR, decayFactor) {
-  if (r <= 0) return 0;
-  const nR = r / maxR;
-  if (nR > 1) return 0;
-  return base * Math.pow(1 - nR, 2) * Math.exp(-r / (maxR * decayFactor));
-}
-
-function isHeartVisible(x, y, size) {
-  if (!config.enableClipping) return true;
-  const halfSize = size / 2;
-  return (
-    x + halfSize >= 0 &&
-    x - halfSize <= width &&
-    y + halfSize >= 0 &&
-    y - halfSize <= height
-  );
+// --- CORREZIONE 2: STATS AGGIORNATE CORRETTAMENTE ---
+function updateStats() {
+  stats.fps = frameRate();
+  stats.sourcesCount = sources.length;
+  const statsDisplay = document.getElementById("stats-display");
+  if (statsDisplay) {
+    statsDisplay.children[0].textContent = `FPS: ${stats.fps.toFixed(1)}`;
+    statsDisplay.children[1].textContent = `Sorgenti: ${stats.sourcesCount}`;
+    statsDisplay.children[2].textContent = `Onde: ${stats.wavesDrawn}`;
+  }
 }
