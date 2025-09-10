@@ -2,21 +2,26 @@
 // Parametri Principali (Configurazione Iniziale)
 // ---------------------
 const config = {
-  // --- ONDE PRIMARIE ---
-  speedPrimary: 30,
-  intervalPrimary: 0.3,
-  strokePrimary: 80,
-  alphaPrimary: 0.8,
-  decayFactorPrimary: 1.5,
-
-  // --- ONDE SECONDARIE ---
-  speedSecondary: 30,
-  intervalSecondary: 0.2,
-  strokeSecondary: 20,
-  alphaSecondary: 0.8,
-  decayFactorSecondary: 1.5,
-
-  // --- IMPOSTAZIONI GENERALI ---
+  waveTypes: [
+    {
+      name: "primary",
+      speed: 30,
+      interval: 0.3,
+      stroke: 80,
+      alpha: 0.8,
+      decay: 1.5,
+      colorKey: "stroke",
+    },
+    {
+      name: "secondary",
+      speed: 30,
+      interval: 0.2,
+      stroke: 20,
+      alpha: 0.8,
+      decay: 1.5,
+      colorKey: "stroke2",
+    },
+  ],
   maxWaves: 5,
   maxReflections: 2,
   alphaThreshold: 0.005,
@@ -31,9 +36,9 @@ const pal = {
   stroke2: "#5bd44c",
 };
 
-// Salviamo i default per il reset
-const defaultConfig = { ...config };
-const defaultPal = { ...pal };
+// Salviamo i default per il reset (usando JSON per una copia profonda)
+let defaultConfig = JSON.parse(JSON.stringify(config));
+let defaultPal = { ...pal };
 
 // ---------------------
 // Stato e Metriche
@@ -182,14 +187,21 @@ function initializeUI() {
     const slider = group.querySelector('input[type="range"]');
     const numberInput = group.querySelector('input[type="number"]');
     const key = group.dataset.key;
-    const target = group.dataset.target === "config" ? config : pal;
     const step = Number(slider.step);
     const decimals =
       step < 1 ? (step.toString().split(".")[1] || "").length : 0;
 
     const updateValue = (val) => {
       const numVal = Number(val);
-      target[key] = numVal;
+      if (key.includes("Primary")) {
+        const prop = key.replace("Primary", "").toLowerCase();
+        config.waveTypes[0][prop] = numVal;
+      } else if (key.includes("Secondary")) {
+        const prop = key.replace("Secondary", "").toLowerCase();
+        config.waveTypes[1][prop] = numVal;
+      } else {
+        config[key] = numVal;
+      }
       slider.value = numVal;
       numberInput.value = numVal.toFixed(decimals);
     };
@@ -215,10 +227,69 @@ function initializeUI() {
     });
   });
 
+  // GESTIONE PRESET
+  const presetSelect = document.getElementById("preset-select");
+  if (presetSelect) {
+    const savePresetBtn = document.getElementById("save-preset-btn");
+    const loadPresetBtn = document.getElementById("load-preset-btn");
+    const deletePresetBtn = document.getElementById("delete-preset-btn");
+
+    function updatePresetList() {
+      presetSelect.innerHTML =
+        '<option value="">Seleziona un preset...</option>';
+      const presets = JSON.parse(localStorage.getItem("wavePresets")) || {};
+      for (const name in presets) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        presetSelect.appendChild(option);
+      }
+    }
+
+    savePresetBtn.addEventListener("click", () => {
+      const name = prompt("Inserisci un nome per il preset:");
+      if (name) {
+        const presets = JSON.parse(localStorage.getItem("wavePresets")) || {};
+        presets[name] = {
+          config: JSON.parse(JSON.stringify(config)),
+          pal: { ...pal },
+        };
+        localStorage.setItem("wavePresets", JSON.stringify(presets));
+        updatePresetList();
+      }
+    });
+
+    loadPresetBtn.addEventListener("click", () => {
+      const name = presetSelect.value;
+      if (name) {
+        const presets = JSON.parse(localStorage.getItem("wavePresets")) || {};
+        if (presets[name]) {
+          Object.assign(config, presets[name].config);
+          Object.assign(pal, presets[name].pal);
+          updateUIFromState();
+        }
+      }
+    });
+
+    deletePresetBtn.addEventListener("click", () => {
+      const name = presetSelect.value;
+      if (
+        name &&
+        confirm(`Sei sicuro di voler eliminare il preset "${name}"?`)
+      ) {
+        const presets = JSON.parse(localStorage.getItem("wavePresets")) || {};
+        delete presets[name];
+        localStorage.setItem("wavePresets", JSON.stringify(presets));
+        updatePresetList();
+      }
+    });
+
+    updatePresetList();
+  }
+
   document
     .getElementById("save-waves-btn")
     .addEventListener("click", saveWaves);
-
   document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", clearSources);
   document
@@ -260,8 +331,17 @@ function updateUIFromState() {
     const slider = group.querySelector('input[type="range"]');
     const numberInput = group.querySelector('input[type="number"]');
     const key = group.dataset.key;
-    const target = group.dataset.target === "config" ? config : pal;
-    const val = target[key];
+    let val;
+
+    if (key.includes("Primary")) {
+      const prop = key.replace("Primary", "").toLowerCase();
+      val = config.waveTypes[0][prop];
+    } else if (key.includes("Secondary")) {
+      const prop = key.replace("Secondary", "").toLowerCase();
+      val = config.waveTypes[1][prop];
+    } else {
+      val = config[key];
+    }
 
     if (val !== undefined) {
       const step = Number(slider.step);
@@ -332,8 +412,11 @@ function resetSimulation() {
   clearSources();
   t = 0;
   paused = false;
+
+  config.waveTypes = JSON.parse(JSON.stringify(defaultConfig.waveTypes));
   Object.assign(config, defaultConfig);
   Object.assign(pal, defaultPal);
+
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
   updateUIFromState();
@@ -409,58 +492,36 @@ class WaveSource {
   }
 
   drawWaveLayer(c) {
-    let total = 0;
-    total += this.drawWave(
-      this.imageSources,
-      config.speedPrimary,
-      config.intervalPrimary,
-      config.strokePrimary,
-      config.alphaPrimary,
-      pal.stroke,
-      config.decayFactorPrimary,
-      c
-    );
-    total += this.drawWave(
-      this.imageSources,
-      config.speedSecondary,
-      config.intervalSecondary,
-      config.strokeSecondary,
-      config.alphaSecondary,
-      pal.stroke2,
-      config.decayFactorSecondary,
-      c
-    );
-    return total;
+    let wavesDrawn = 0;
+    for (const wave of config.waveTypes) {
+      wavesDrawn += this.drawSingleWaveType(wave, c);
+    }
+    return wavesDrawn;
   }
 
-  drawWave(
-    imgSources,
-    speed,
-    interval,
-    strokeW,
-    alphaBase,
-    color,
-    decayFactor,
-    c
-  ) {
+  drawSingleWaveType(wave, c) {
     let wavesDrawn = 0;
-    c.strokeWeight(strokeW);
-    for (const s of imgSources) {
+    c.strokeWeight(wave.stroke);
+    for (const s of this.imageSources) {
       for (let i = 0; i < config.maxWaves; i++) {
-        const r = speed * (this.t - i * interval);
+        const r = wave.speed * (this.t - i * wave.interval);
         if (r < 0 || r > maxR) continue;
         if (!isCircleVisible(s.pos.x, s.pos.y, r)) continue;
-        const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
+
+        const alpha = calcAlpha(wave.alpha, r, maxR, wave.decay);
         if (alpha < config.alphaThreshold) continue;
+
         const hexAlpha = Math.floor(alpha * 255)
           .toString(16)
           .padStart(2, "0");
-        c.stroke(`${color}${hexAlpha}`);
+        c.stroke(`${pal[wave.colorKey]}${hexAlpha}`);
+
         c.push();
         c.translate(s.pos.x, s.pos.y);
         c.scale(s.scaleX, s.scaleY);
         drawHeartShapeUniversal(c, 0, 0, r * 2);
         c.pop();
+
         wavesDrawn++;
       }
     }
@@ -471,18 +532,14 @@ class WaveSource {
     const oldestWaveTime =
       this.t -
       (config.maxWaves - 1) *
-        Math.max(config.intervalPrimary, config.intervalSecondary);
+        Math.max(...config.waveTypes.map((w) => w.interval));
     if (oldestWaveTime < 0) return true;
+
     const r_max =
-      Math.max(config.speedPrimary, config.speedSecondary) * oldestWaveTime;
-    return (
-      calcAlpha(
-        1.0,
-        r_max,
-        maxR,
-        Math.max(config.decayFactorPrimary, config.decayFactorSecondary)
-      ) > config.alphaThreshold
-    );
+      Math.max(...config.waveTypes.map((w) => w.speed)) * oldestWaveTime;
+    const decay_max = Math.max(...config.waveTypes.map((w) => w.decay));
+
+    return calcAlpha(1.0, r_max, maxR, decay_max) > config.alphaThreshold;
   }
 
   destroy() {
