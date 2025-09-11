@@ -31,8 +31,8 @@ const pal = {
   stroke2: "#5bd44c",
 };
 
-const defaultConfig = { ...config };
-const defaultPal = { ...pal };
+const defaultConfig = JSON.parse(JSON.stringify(config));
+const defaultPal = JSON.parse(JSON.stringify(pal));
 
 let t = 0;
 let paused = false;
