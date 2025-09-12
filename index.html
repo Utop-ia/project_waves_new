@@ -359,33 +359,39 @@
           <div class="panel-content">
             <div class="color-picker-group">
               <label for="bg">Colore Sfondo</label>
-              <input
-                type="color"
-                id="bg"
-                data-key="bg"
-                data-target="pal"
-                value="#ffffff"
-              />
+              <div class="color-input-wrapper">
+                <input
+                  type="color"
+                  id="bg-picker"
+                  data-key="bg"
+                  data-target="pal"
+                />
+                <input type="text" id="bg-hex" class="hex-input" />
+              </div>
             </div>
             <div class="color-picker-group">
               <label for="stroke">Colore Primario</label>
-              <input
-                type="color"
-                id="stroke"
-                data-key="stroke"
-                data-target="pal"
-                value="#34553c"
-              />
+              <div class="color-input-wrapper">
+                <input
+                  type="color"
+                  id="stroke-picker"
+                  data-key="stroke"
+                  data-target="pal"
+                />
+                <input type="text" id="stroke-hex" class="hex-input" />
+              </div>
             </div>
             <div class="color-picker-group">
               <label for="stroke2">Colore Secondario</label>
-              <input
-                type="color"
-                id="stroke2"
-                data-key="stroke2"
-                data-target="pal"
-                value="#5bd44c"
-              />
+              <div class="color-input-wrapper">
+                <input
+                  type="color"
+                  id="stroke2-picker"
+                  data-key="stroke2"
+                  data-target="pal"
+                />
+                <input type="text" id="stroke2-hex" class="hex-input" />
+              </div>
             </div>
             <div
               class="checkbox-group"
