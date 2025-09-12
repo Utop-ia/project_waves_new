@@ -250,8 +250,6 @@ function draw() {
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
 
-  // RIMOSSA la logica di zoom digitale da qui
-
   waveLayer.push();
   waveLayer.clip(() => {
     waveLayer.rect(0, 0, width, height);
@@ -272,6 +270,21 @@ function draw() {
 
   background(pal.bg);
   image(waveLayer, 0, 0);
+
+  // ===================================================================
+  // INDICATORE DI PAUSA
+  // ===================================================================
+  if (paused) {
+    fill(0, 0, 0, 100);
+    noStroke();
+    rect(0, 0, width, height);
+
+    fill(255, 255, 255, 200);
+    textSize(min(width, height) * 0.075);
+    textAlign(CENTER, CENTER);
+    textStyle(NORMAL);
+    text("PAUSA", width / 2, height / 2);
+  }
 
   updateStats();
 }
@@ -379,7 +392,6 @@ class WaveSource {
         c.push();
         c.translate(s.pos.x, s.pos.y);
         c.scale(s.scaleX, s.scaleY);
-        // MODIFICATO per usare la dimensione del cuore
         drawHeartShapeUniversal(c, 0, 0, r * 2 * config.heartBaseSize);
         c.pop();
         wavesDrawn++;
@@ -482,21 +494,17 @@ function initializeUI() {
     });
   });
 
-  // GESTIONE VISIBILITÀ ONDE
   const waveDisplaySelect = document.getElementById("wave-display-select");
   waveDisplaySelect.addEventListener("change", () => {
     config.waveDisplayMode = waveDisplaySelect.value;
   });
 
-  // GESTIONE ZOOM CON PULSANTE
   const applyZoomBtn = document.getElementById("apply-zoom-btn");
   applyZoomBtn.addEventListener("click", applyCanvasZoom);
 
-  // --- LOGICA PRESET ---
   const presetSelect = document.getElementById("preset-select");
   const applyPresetBtn = document.getElementById("apply-preset-btn");
 
-  // Popola il menu a tendina
   for (const name in brandPresets) {
     const option = document.createElement("option");
     option.value = name;
@@ -504,7 +512,6 @@ function initializeUI() {
     presetSelect.appendChild(option);
   }
 
-  // Applica il preset solo quando il pulsante viene cliccato
   applyPresetBtn.addEventListener("click", () => {
     const presetName = presetSelect.value;
     if (brandPresets[presetName]) {
@@ -593,10 +600,7 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  // Controlla che l'elemento cliccato sia il canvas di p5.js
-  // (p5 aggiunge di default la classe 'p5Canvas' all'elemento canvas)
   if (event.target.classList.contains("p5Canvas")) {
-    // Ora esegue la logica precedente solo se il target è corretto
     if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
       if (sources.length < config.maxSources)
         sources.unshift(new WaveSource(mouseX, mouseY));
@@ -627,31 +631,22 @@ function clearSources() {
   else waveLayer.clear();
 }
 
-// ============== FUNZIONE MODIFICATA ==============
 function resetSimulation() {
-  // 1. Pulisce le onde e resetta il tempo/pausa
   clearSources();
   t = 0;
   paused = false;
 
-  // 2. Resetta tutti i parametri degli oggetti config e pal ai valori di default
   Object.assign(config, defaultConfig);
   Object.assign(pal, defaultPal);
 
-  // 3. Resetta il FORMATO del canvas allo stato iniziale ("Superficie di Visualizzazione")
   document.getElementById("format-select").value = "viewport";
-  document.getElementById("custom-format-inputs").classList.add("hidden"); // Nasconde input custom
+  document.getElementById("custom-format-inputs").classList.add("hidden");
   const canvasContainer = document.getElementById("canvas-container");
   resizeCanvasAndContent(
     canvasContainer.clientWidth,
     canvasContainer.clientHeight
   );
 
-  // 4. Resetta lo ZOOM del canvas a 100%
-  // Nota: resizeCanvasAndContent() chiama già applyCanvasZoom(),
-  // quindi lo zoom si resetterà automaticamente perché config.zoomSelection è stato riportato a '1'
-
-  // 5. Aggiorna l'intera UI per riflettere i parametri resettati
   updateUIFromState();
 }
 
@@ -667,7 +662,6 @@ function resizeCanvasAndContent(w, h) {
   maxR = Math.hypot(width, height);
   sources.forEach((src) => src.calculateImageSources());
 
-  // Applica lo zoom corrente al nuovo formato
   applyCanvasZoom();
 }
 
@@ -675,7 +669,6 @@ function resizeCanvasAndContent(w, h) {
 // Funzione salvataggio PNG
 // ===================================================================
 function saveWaves() {
-  // Ora il salvataggio non richiede lo zoom, salva l'immagine alla sua risoluzione nativa
   const tempCanvas = createGraphics(width, height);
   if (config.saveBackground) tempCanvas.background(pal.bg);
   else tempCanvas.clear();
@@ -694,14 +687,12 @@ function saveWaves() {
 // ===================================================================
 function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
-  // Se la modalità è viewport, ridimensiona il canvas di p5
   if (document.getElementById("format-select").value === "viewport") {
     resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
     waveLayer.resizeCanvas(width, height);
     maxR = Math.hypot(width, height);
     sources.forEach((src) => src.calculateImageSources());
   }
-  // Applica sempre lo zoom per adattare alla nuova dimensione della finestra
   applyCanvasZoom();
 }
 
