@@ -7,12 +7,14 @@ const config = {
   strokePrimary: 80,
   alphaPrimary: 0.8,
   decayFactorPrimary: 1.5,
+  heartSizePrimary: 1, // NUOVO
 
   speedSecondary: 30,
   intervalSecondary: 0.2,
   strokeSecondary: 20,
   alphaSecondary: 0.8,
   decayFactorSecondary: 1.5,
+  heartSizeSecondary: 1, // NUOVO
 
   maxWaves: 5,
   maxReflections: 2,
@@ -22,7 +24,6 @@ const config = {
   saveBackground: true,
   waveDisplayMode: "both",
   zoomSelection: "1",
-  heartBaseSize: 1,
 };
 
 const pal = {
@@ -64,11 +65,13 @@ const brandPresets = {
       strokePrimary: 50,
       alphaPrimary: 0.8,
       decayFactorPrimary: 2.0,
+      heartSizePrimary: 1,
       speedSecondary: 50,
       intervalSecondary: 0.4,
       strokeSecondary: 25,
       alphaSecondary: 0.8,
       decayFactorPrimary: 2.0,
+      heartSizeSecondary: 1,
       maxWaves: 3,
       maxReflections: 2,
     },
@@ -80,11 +83,13 @@ const brandPresets = {
       strokePrimary: 40,
       alphaPrimary: 0.9,
       decayFactorPrimary: 0.8,
+      heartSizePrimary: 0.8,
       speedSecondary: 120,
       intervalSecondary: 0.1,
       strokeSecondary: 15,
       alphaSecondary: 0.9,
       decayFactorPrimary: 0.8,
+      heartSizeSecondary: 0.8,
       maxWaves: 5,
       maxReflections: 1,
     },
@@ -96,11 +101,13 @@ const brandPresets = {
       strokePrimary: 60,
       alphaPrimary: 0.4,
       decayFactorPrimary: 3.0,
+      heartSizePrimary: 1.2,
       speedSecondary: 20,
       intervalSecondary: 0.8,
       strokeSecondary: 30,
       alphaSecondary: 0.4,
       decayFactorPrimary: 3.0,
+      heartSizeSecondary: 1.2,
       maxWaves: 10,
       maxReflections: 4,
     },
@@ -112,11 +119,13 @@ const brandPresets = {
       strokePrimary: 120,
       alphaPrimary: 0.85,
       decayFactorPrimary: 2.5,
+      heartSizePrimary: 1.5,
       speedSecondary: 40,
       intervalSecondary: 0.4,
       strokeSecondary: 60,
       alphaSecondary: 0.85,
-      decayFactorPrimary: 2.5,
+      decayFactorSecondary: 2.5,
+      heartSizeSecondary: 1.5,
       maxWaves: 5,
       maxReflections: 2,
     },
@@ -128,11 +137,13 @@ const brandPresets = {
       strokePrimary: 10,
       alphaPrimary: 0.2,
       decayFactorPrimary: 4.0,
+      heartSizePrimary: 1,
       speedSecondary: 15,
       intervalSecondary: 1.5,
       strokeSecondary: 5,
       alphaSecondary: 0.2,
       decayFactorPrimary: 4.0,
+      heartSizeSecondary: 1,
       maxWaves: 5,
       maxReflections: 1,
     },
@@ -144,11 +155,13 @@ const brandPresets = {
       strokePrimary: 10,
       alphaPrimary: 0.9,
       decayFactorPrimary: 1.5,
+      heartSizePrimary: 0.5,
       speedSecondary: 25,
       intervalSecondary: 0.6,
       strokeSecondary: 90,
       alphaSecondary: 0.7,
       decayFactorSecondary: 2.5,
+      heartSizeSecondary: 2,
       maxWaves: 7,
       maxReflections: 3,
     },
@@ -271,18 +284,12 @@ function draw() {
   background(pal.bg);
   image(waveLayer, 0, 0);
 
-  // ===================================================================
-  // INDICATORE DI PAUSA
-  // ===================================================================
   if (paused) {
-    //overlay
     fill(0, 0, 0, 100);
     noStroke();
     rect(0, 0, width, height);
-
-    // testo "pausa"
     fill(255, 255, 255, 200);
-    textSize(min(width, height) * 0.075);
+    textSize(min(width, height) * 0.1);
     textAlign(CENTER, CENTER);
     textStyle(NORMAL);
     text("PAUSA", width / 2, height / 2);
@@ -344,6 +351,7 @@ class WaveSource {
         config.alphaPrimary,
         pal.stroke,
         config.decayFactorPrimary,
+        config.heartSizePrimary, // Passa la dimensione primaria
         c
       );
     }
@@ -360,6 +368,7 @@ class WaveSource {
         config.alphaSecondary,
         pal.stroke2,
         config.decayFactorSecondary,
+        config.heartSizeSecondary, // Passa la dimensione secondaria
         c
       );
     }
@@ -375,6 +384,7 @@ class WaveSource {
     alphaBase,
     color,
     decayFactor,
+    heartSize, // Riceve la dimensione
     c
   ) {
     let wavesDrawn = 0;
@@ -383,8 +393,7 @@ class WaveSource {
       for (let i = 0; i < config.maxWaves; i++) {
         const r = speed * (this.t - i * interval);
         if (r < 0 || r > maxR) continue;
-        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2 * config.heartBaseSize))
-          continue;
+        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2 * heartSize)) continue;
         const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
         if (alpha < config.alphaThreshold) continue;
         const hexAlpha = Math.floor(alpha * 255)
@@ -394,7 +403,7 @@ class WaveSource {
         c.push();
         c.translate(s.pos.x, s.pos.y);
         c.scale(s.scaleX, s.scaleY);
-        drawHeartShapeUniversal(c, 0, 0, r * 2 * config.heartBaseSize);
+        drawHeartShapeUniversal(c, 0, 0, r * 2 * heartSize); // Usa la dimensione
         c.pop();
         wavesDrawn++;
       }
