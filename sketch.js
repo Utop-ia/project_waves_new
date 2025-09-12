@@ -5,18 +5,18 @@ const config = {
   speedPrimary: 30,
   intervalPrimary: 0.3,
   strokePrimary: 80,
-  alphaPrimary: 0.7,
+  alphaPrimary: 0.8,
   decayFactorPrimary: 1.5,
   heartSizePrimary: 1,
-  maxWavesPrimary: 3,
+  maxWavesPrimary: 5,
 
   speedSecondary: 30,
   intervalSecondary: 0.2,
   strokeSecondary: 20,
-  alphaSecondary: 0.7,
+  alphaSecondary: 0.8,
   decayFactorSecondary: 1.5,
   heartSizeSecondary: 1,
-  maxWavesSecondary: 3,
+  maxWavesSecondary: 5,
 
   maxReflections: 2,
   alphaThreshold: 0.005,
@@ -53,7 +53,7 @@ let isRecordingAnimation = false;
 let recordingStartTime = 0;
 let recordedEvents = [];
 let savedAnimationCount = 0;
-const userAnimationPresets = {}; // Oggetto per le animazioni salvate
+const userAnimationPresets = {};
 
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
@@ -179,7 +179,7 @@ const brandPresets = {
       intervalSecondary: 0.6,
       strokeSecondary: 90,
       alphaSecondary: 0.7,
-      decayFactorPrimary: 2.5,
+      decayFactorSecondary: 2.5,
       heartSizeSecondary: 2,
       maxWavesSecondary: 7,
       maxReflections: 3,
@@ -191,7 +191,7 @@ const brandPresets = {
 // DATABASE DELLE ANIMAZIONI
 // ===================================================================
 const animationPresets = {
-  "Battito Umbro (Default)": {
+  "Battito Umbro": {
     duration: 8,
     events: [
       {
@@ -757,11 +757,11 @@ function initializeUI() {
   }
 
   animPresetSelect.addEventListener("change", () => {
-    userAnimSelect.value = "";
+    if (animPresetSelect.value !== "") userAnimSelect.value = "";
     updateManageButtons();
   });
   userAnimSelect.addEventListener("change", () => {
-    animPresetSelect.value = "";
+    if (userAnimSelect.value !== "") animPresetSelect.value = "";
     updateManageButtons();
   });
   updateManageButtons();
@@ -990,7 +990,7 @@ function toggleAnimationRecording() {
     if (recordedEvents.length > 0) {
       savedAnimationCount++;
       const newAnimationName = `Animazione Salvata ${savedAnimationCount}`;
-      const duration = (millis() - recordingStartTime) / 1000 + 3; // Aggiungi 3s di coda
+      const duration = (millis() - recordingStartTime) / 1000 + 3;
 
       userAnimationPresets[newAnimationName] = {
         duration: duration,

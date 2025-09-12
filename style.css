@@ -134,6 +134,10 @@ label {
   margin-bottom: 20px;
 }
 
+.panel-content > div:last-child {
+  margin-bottom: 0;
+}
+
 .slider-input-wrapper {
   display: flex;
   align-items: center;
