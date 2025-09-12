@@ -14,31 +14,31 @@
       <aside id="ui-sidebar">
         <header>
           <h1>Risonanza</h1>
-          <p>Simulatore di Onde</p>
+          <p>Simulatore di onde</p>
         </header>
 
         <div class="ui-panel">
-          <h2 class="panel-header active">Preset Aspetto</h2>
+          <h2 class="panel-header active">Aspetto</h2>
           <div class="panel-content show">
             <div class="preset-group">
-              <label for="preset-select">Seleziona uno stato</label>
+              <label for="preset-select">Seleziona un'aspetto</label>
               <select id="preset-select"></select>
-              <button id="apply-preset-btn">Applica Preset</button>
+              <button id="apply-preset-btn">Applica aspetto</button>
             </div>
           </div>
         </div>
 
         <div class="ui-panel">
-          <h2 class="panel-header active">Preset Animazione</h2>
+          <h2 class="panel-header active">Animazioni</h2>
           <div class="panel-content show">
             <div class="preset-group">
               <label for="animation-preset-select"
-                >Animazioni Predefinite</label
+                >Animazioni predefinite</label
               >
               <select id="animation-preset-select"></select>
             </div>
             <div class="preset-group">
-              <label for="user-animation-select">Le Tue Animazioni</label>
+              <label for="user-animation-select">Le tue animazioni</label>
               <div class="animation-controls">
                 <select id="user-animation-select"></select>
                 <div class="manage-buttons">
@@ -48,9 +48,7 @@
               </div>
             </div>
             <div class="preset-group">
-              <button id="play-animation-btn">
-                Play Animazione Selezionata
-              </button>
+              <button id="play-animation-btn">Avvia</button>
             </div>
             <div
               class="preset-group"
@@ -61,7 +59,7 @@
             >
               <label for="record-animation-btn">Crea la tua animazione</label>
               <button id="record-animation-btn">
-                Registra Nuova Animazione
+                Registra nuova animazione
               </button>
               <p
                 id="record-status"
@@ -78,14 +76,14 @@
         </div>
 
         <div class="ui-panel">
-          <h2 class="panel-header">Impostazioni Generali</h2>
+          <h2 class="panel-header">Impostazioni generali</h2>
           <div class="panel-content">
             <div
               class="slider-group"
               data-key="maxSources"
               data-target="config"
             >
-              <label>Numero Sorgenti Max</label>
+              <label>Numero di sorgenti</label>
               <div class="slider-input-wrapper">
                 <input type="range" min="1" max="20" step="1" value="5" />
                 <input
@@ -103,7 +101,7 @@
               data-key="maxReflections"
               data-target="config"
             >
-              <label>Numero Riflessioni</label>
+              <label>Numero di riflessioni</label>
               <div class="slider-input-wrapper">
                 <input type="range" min="0" max="10" step="1" value="2" />
                 <input
@@ -125,7 +123,7 @@
             <div class="preset-group">
               <select id="format-select">
                 <option value="viewport" selected>
-                  Superficie di Visualizzazione
+                  Superficie di visualizzazione
                 </option>
                 <option value="595x842">Stampa: A4 (Verticale)</option>
                 <option value="842x1191">Stampa: A3 (Verticale)</option>
@@ -152,20 +150,20 @@
               </div>
             </div>
             <div class="preset-group">
-              <button id="apply-format-btn">Applica Formato</button>
+              <button id="apply-format-btn">Applica formato</button>
             </div>
           </div>
         </div>
 
         <div class="ui-panel">
-          <h2 class="panel-header">Visibilità Onde</h2>
+          <h2 class="panel-header">Visibilità onde</h2>
           <div class="panel-content">
             <div class="preset-group">
               <label for="wave-display-select">Mostra onde</label>
               <select id="wave-display-select">
-                <option value="both" selected>Entrambe le Onde</option>
-                <option value="primary">Solo Onde Primarie</option>
-                <option value="secondary">Solo Onde Secondarie</option>
+                <option value="both" selected>Entrambe le onde</option>
+                <option value="primary">Solo onde primarie</option>
+                <option value="secondary">Solo onde secondarie</option>
               </select>
             </div>
           </div>
@@ -175,9 +173,9 @@
           <h2 class="panel-header">Zoom</h2>
           <div class="panel-content">
             <div class="preset-group">
-              <label for="zoom-select">Livello Zoom</label>
+              <label for="zoom-select">Livello zoom</label>
               <select id="zoom-select">
-                <option value="fit">Adatta allo Schermo</option>
+                <option value="fit">Adatta allo schermo</option>
                 <option value="0.25">25%</option>
                 <option value="0.5">50%</option>
                 <option value="0.75">75%</option>
@@ -186,20 +184,20 @@
                 <option value="2">200%</option>
                 <option value="4">400%</option>
               </select>
-              <button id="apply-zoom-btn">Applica Zoom</button>
+              <button id="apply-zoom-btn">Applica zoom</button>
             </div>
           </div>
         </div>
 
         <div class="ui-panel">
-          <h2 class="panel-header">Onde Primarie</h2>
+          <h2 class="panel-header">Onde primarie</h2>
           <div class="panel-content">
             <div
               class="slider-group"
               data-key="maxWavesPrimary"
               data-target="config"
             >
-              <label>Numero Onde</label>
+              <label>Numero onde</label>
               <div class="slider-input-wrapper">
                 <input type="range" min="1" max="20" step="1" value="5" />
                 <input
@@ -301,7 +299,7 @@
               data-key="heartSizePrimary"
               data-target="config"
             >
-              <label>Dimensione Cuore</label>
+              <label>Dimensione</label>
               <div class="slider-input-wrapper">
                 <input type="range" min="0.1" max="3" step="0.05" value="1" />
                 <input
@@ -336,7 +334,7 @@
         </div>
 
         <div class="ui-panel">
-          <h2 class="panel-header">Onde Secondarie</h2>
+          <h2 class="panel-header">Onde secondarie</h2>
           <div class="panel-content">
             <div
               class="slider-group"
@@ -445,7 +443,7 @@
               data-key="heartSizeSecondary"
               data-target="config"
             >
-              <label>Dimensione Cuore</label>
+              <label>Dimensione</label>
               <div class="slider-input-wrapper">
                 <input type="range" min="0.1" max="3" step="0.05" value="1" />
                 <input
@@ -480,7 +478,7 @@
         </div>
 
         <div class="ui-panel">
-          <h2 class="panel-header">Stile & Esporta</h2>
+          <h2 class="panel-header">Stile & esporta</h2>
           <div class="panel-content">
             <div class="color-picker-group">
               <label>Colore Sfondo</label>
@@ -495,7 +493,7 @@
               </div>
             </div>
             <div class="color-picker-group">
-              <label>Colore Primario</label>
+              <label>Colore primario</label>
               <div class="color-input-wrapper">
                 <input
                   type="color"
@@ -507,7 +505,7 @@
               </div>
             </div>
             <div class="color-picker-group">
-              <label>Colore Secondario</label>
+              <label>Colore secondario</label>
               <div class="color-input-wrapper">
                 <input
                   type="color"

@@ -29,8 +29,8 @@ const config = {
 
 const pal = {
   bg: "#ffffff",
-  stroke: "#34553c",
-  stroke2: "#5bd44c",
+  stroke: "#385a3e",
+  stroke2: "#acab6b",
 };
 
 const defaultConfig = JSON.parse(JSON.stringify(config));
@@ -191,7 +191,7 @@ const brandPresets = {
 // DATABASE DELLE ANIMAZIONI
 // ===================================================================
 const animationPresets = {
-  "Battito Umbro": {
+  "Battito Umbro (Default)": {
     duration: 8,
     events: [
       {
@@ -468,7 +468,7 @@ function draw() {
     fill(255, 255, 255, 200);
     textSize(min(width, height) * 0.1);
     textAlign(CENTER, CENTER);
-    textStyle(BOLD);
+    textStyle(NORMAL);
     text("PAUSA", width / 2, height / 2);
   }
 
