@@ -28,8 +28,8 @@ const config = {
 
 const pal = {
   bg: "#ffffff",
-  stroke: "#385a3e",
-  stroke2: "#acab6b",
+  stroke: "#34553c",
+  stroke2: "#5bd44c",
 };
 
 const defaultConfig = JSON.parse(JSON.stringify(config));
@@ -42,6 +42,15 @@ const stats = { fps: 0, sourcesCount: 0, wavesDrawn: 0 };
 let maxR;
 let waveLayer;
 const vectorPool = [];
+
+// ===================================================================
+// NUOVE VARIABILI PER L'ANIMAZIONE
+// ===================================================================
+let isPlayingAnimation = false;
+let animationTime = 0;
+let currentSequence = [];
+let nextEventIndex = 0;
+
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
     const v = vectorPool.pop();
@@ -124,7 +133,7 @@ const brandPresets = {
       intervalSecondary: 0.4,
       strokeSecondary: 60,
       alphaSecondary: 0.85,
-      decayFactorSecondary: 2.5,
+      decayFactorPrimary: 2.5,
       heartSizeSecondary: 1.5,
       maxWaves: 5,
       maxReflections: 2,
@@ -165,6 +174,47 @@ const brandPresets = {
       maxWaves: 7,
       maxReflections: 3,
     },
+  },
+};
+
+// ===================================================================
+// NUOVO: DATABASE DELLE ANIMAZIONI
+// ===================================================================
+const animationPresets = {
+  "Centro Pulsante": {
+    duration: 3, // Durata totale in secondi
+    events: [{ time: 0.5, x: 0.5, y: 0.5 }],
+  },
+  "Pioggia Lenta": {
+    duration: 5,
+    events: [
+      { time: 0.2, x: 0.25, y: 0.2 },
+      { time: 0.9, x: 0.7, y: 0.4 },
+      { time: 1.5, x: 0.4, y: 0.8 },
+      { time: 2.3, x: 0.8, y: 0.7 },
+      { time: 3.0, x: 0.15, y: 0.6 },
+    ],
+  },
+  "Onda Orizzontale": {
+    duration: 4,
+    events: [
+      { time: 0.1, x: 0.1, y: 0.5 },
+      { time: 0.3, x: 0.2, y: 0.5 },
+      { time: 0.5, x: 0.3, y: 0.5 },
+      { time: 0.7, x: 0.4, y: 0.5 },
+      { time: 0.9, x: 0.5, y: 0.5 },
+      { time: 1.1, x: 0.6, y: 0.5 },
+      { time: 1.3, x: 0.7, y: 0.5 },
+      { time: 1.5, x: 0.8, y: 0.5 },
+      { time: 1.7, x: 0.9, y: 0.5 },
+    ],
+  },
+  "Doppio Impulso": {
+    duration: 4,
+    events: [
+      { time: 0.2, x: 0.2, y: 0.3 },
+      { time: 1.2, x: 0.8, y: 0.7 },
+    ],
   },
 };
 
@@ -217,19 +267,19 @@ function setup() {
 }
 
 // ===================================================================
-// Funzione Applica Zoom (NUOVA LOGICA)
+// Funzione Applica Zoom
 // ===================================================================
 function applyCanvasZoom() {
   const canvasEl = document.querySelector("#canvas-container canvas");
   if (!canvasEl) return;
 
   const zoomValue = document.getElementById("zoom-select").value;
-  config.zoomSelection = zoomValue; // Salva la selezione corrente
+  config.zoomSelection = zoomValue;
 
   if (zoomValue === "fit") {
     const container = document.getElementById("canvas-container");
-    const containerW = container.clientWidth - 40; // Sottrae padding
-    const containerH = container.clientHeight - 40; // Sottrae padding
+    const containerW = container.clientWidth - 40;
+    const containerH = container.clientHeight - 40;
 
     const canvasAspectRatio = width / height;
     const containerAspectRatio = containerW / containerH;
@@ -260,6 +310,26 @@ function draw() {
   const dt = paused ? 0 : deltaTime / 1000;
   t += dt;
 
+  // LOGICA DELL'ANIMATORE
+  if (isPlayingAnimation && !paused) {
+    animationTime += dt;
+    // Controlla se ci sono eventi da eseguire
+    if (
+      nextEventIndex < currentSequence.events.length &&
+      animationTime >= currentSequence.events[nextEventIndex].time
+    ) {
+      const event = currentSequence.events[nextEventIndex];
+      sources.unshift(new WaveSource(event.x * width, event.y * height));
+      nextEventIndex++;
+    }
+    // Ferma l'animazione alla fine
+    if (animationTime >= currentSequence.duration) {
+      isPlayingAnimation = false;
+      document.getElementById("play-animation-btn").textContent =
+        "Play Animazione";
+    }
+  }
+
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
 
@@ -289,9 +359,9 @@ function draw() {
     noStroke();
     rect(0, 0, width, height);
     fill(255, 255, 255, 200);
-    textSize(min(width, height) * 0.085);
+    textSize(min(width, height) * 0.1);
     textAlign(CENTER, CENTER);
-    textStyle(NORMAL);
+    textStyle(BOLD);
     text("PAUSA", width / 2, height / 2);
   }
 
@@ -299,7 +369,7 @@ function draw() {
 }
 
 // ===================================================================
-// WaveSource con riflessioni speculari corrette
+// WaveSource (invariato)
 // ===================================================================
 class WaveSource {
   constructor(x, y) {
@@ -436,7 +506,7 @@ class WaveSource {
 }
 
 // ===================================================================
-// Funzioni di supporto
+// Funzioni di supporto (invariate)
 // ===================================================================
 function calcAlpha(base, r, maxR, decayFactor) {
   if (r <= 0) return 0;
@@ -552,6 +622,21 @@ function initializeUI() {
     }
   });
 
+  // NUOVO: GESTIONE PRESET ANIMAZIONE
+  const animPresetSelect = document.getElementById("animation-preset-select");
+  const playAnimBtn = document.getElementById("play-animation-btn");
+
+  for (const name in animationPresets) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    animPresetSelect.appendChild(option);
+  }
+
+  playAnimBtn.addEventListener("click", () => {
+    playAnimation(animPresetSelect.value);
+  });
+
   document
     .getElementById("save-waves-btn")
     .addEventListener("click", saveWaves);
@@ -633,6 +718,7 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
+  if (isPlayingAnimation) return; // Blocca il click durante l'animazione
   if (event.target.classList.contains("p5Canvas")) {
     if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
       if (sources.length < config.maxSources)
@@ -658,6 +744,8 @@ function togglePause() {
 }
 
 function clearSources() {
+  isPlayingAnimation = false; // Ferma anche l'animazione
+  document.getElementById("play-animation-btn").textContent = "Play Animazione";
   sources.forEach((src) => src.destroy());
   sources = [];
   if (config.saveBackground) waveLayer.background(pal.bg);
@@ -681,6 +769,24 @@ function resetSimulation() {
   );
 
   updateUIFromState();
+}
+
+// NUOVA FUNZIONE PER GESTIRE LE ANIMAZIONI
+function playAnimation(presetName) {
+  if (animationPresets[presetName]) {
+    clearSources();
+    if (paused) togglePause();
+
+    currentSequence = animationPresets[presetName];
+    // Ordina gli eventi per tempo per sicurezza
+    currentSequence.events.sort((a, b) => a.time - b.time);
+
+    animationTime = 0;
+    nextEventIndex = 0;
+    isPlayingAnimation = true;
+    document.getElementById("play-animation-btn").textContent =
+      "In Esecuzione...";
+  }
 }
 
 function resizeCanvasAndContent(w, h) {
