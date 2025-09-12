@@ -7,14 +7,14 @@ const config = {
   strokePrimary: 80,
   alphaPrimary: 0.8,
   decayFactorPrimary: 1.5,
-  heartSizePrimary: 1, // NUOVO
+  heartSizePrimary: 1,
 
   speedSecondary: 30,
   intervalSecondary: 0.2,
   strokeSecondary: 20,
   alphaSecondary: 0.8,
   decayFactorSecondary: 1.5,
-  heartSizeSecondary: 1, // NUOVO
+  heartSizeSecondary: 1,
 
   maxWaves: 5,
   maxReflections: 2,
@@ -28,8 +28,8 @@ const config = {
 
 const pal = {
   bg: "#ffffff",
-  stroke: "#34553c",
-  stroke2: "#5bd44c",
+  stroke: "#385a3e",
+  stroke2: "#acab6b",
 };
 
 const defaultConfig = JSON.parse(JSON.stringify(config));
@@ -289,7 +289,7 @@ function draw() {
     noStroke();
     rect(0, 0, width, height);
     fill(255, 255, 255, 200);
-    textSize(min(width, height) * 0.1);
+    textSize(min(width, height) * 0.085);
     textAlign(CENTER, CENTER);
     textStyle(NORMAL);
     text("PAUSA", width / 2, height / 2);
@@ -351,7 +351,7 @@ class WaveSource {
         config.alphaPrimary,
         pal.stroke,
         config.decayFactorPrimary,
-        config.heartSizePrimary, // Passa la dimensione primaria
+        config.heartSizePrimary,
         c
       );
     }
@@ -368,7 +368,7 @@ class WaveSource {
         config.alphaSecondary,
         pal.stroke2,
         config.decayFactorSecondary,
-        config.heartSizeSecondary, // Passa la dimensione secondaria
+        config.heartSizeSecondary,
         c
       );
     }
@@ -384,7 +384,7 @@ class WaveSource {
     alphaBase,
     color,
     decayFactor,
-    heartSize, // Riceve la dimensione
+    heartSize,
     c
   ) {
     let wavesDrawn = 0;
@@ -403,7 +403,7 @@ class WaveSource {
         c.push();
         c.translate(s.pos.x, s.pos.y);
         c.scale(s.scaleX, s.scaleY);
-        drawHeartShapeUniversal(c, 0, 0, r * 2 * heartSize); // Usa la dimensione
+        drawHeartShapeUniversal(c, 0, 0, r * 2 * heartSize);
         c.pop();
         wavesDrawn++;
       }
@@ -490,10 +490,27 @@ function initializeUI() {
     );
   });
 
-  document.querySelectorAll('input[type="color"]').forEach((picker) => {
+  document.querySelectorAll(".color-input-wrapper").forEach((wrapper) => {
+    const picker = wrapper.querySelector('input[type="color"]');
+    const hexInput = wrapper.querySelector('input[type="text"]');
     const key = picker.dataset.key;
+
     picker.addEventListener("input", () => {
       pal[key] = picker.value;
+      hexInput.value = picker.value;
+    });
+
+    hexInput.addEventListener("change", () => {
+      let value = hexInput.value;
+      if (!value.startsWith("#")) {
+        value = "#" + value;
+      }
+      if (/^#([0-9A-F]{3}){1,2}$/i.test(value)) {
+        pal[key] = value;
+        picker.value = value;
+      } else {
+        hexInput.value = pal[key];
+      }
     });
   });
 
@@ -591,9 +608,14 @@ function updateUIFromState() {
     }
   });
 
-  document.querySelectorAll('input[type="color"]').forEach((picker) => {
-    picker.value = pal[picker.dataset.key];
+  document.querySelectorAll(".color-input-wrapper").forEach((wrapper) => {
+    const picker = wrapper.querySelector('input[type="color"]');
+    const hexInput = wrapper.querySelector('input[type="text"]');
+    const key = picker.dataset.key;
+    picker.value = pal[key];
+    hexInput.value = pal[key];
   });
+
   document.querySelector(".checkbox-group input").checked =
     config.saveBackground;
 
