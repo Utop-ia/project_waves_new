@@ -275,10 +275,12 @@ function draw() {
   // INDICATORE DI PAUSA
   // ===================================================================
   if (paused) {
+    //overlay
     fill(0, 0, 0, 100);
     noStroke();
     rect(0, 0, width, height);
 
+    // testo "pausa"
     fill(255, 255, 255, 200);
     textSize(min(width, height) * 0.075);
     textAlign(CENTER, CENTER);
