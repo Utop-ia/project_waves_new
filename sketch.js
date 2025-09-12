@@ -28,8 +28,8 @@ const config = {
 
 const pal = {
   bg: "#ffffff",
-  stroke: "#34553c",
-  stroke2: "#5bd44c",
+  stroke: "#385a3e",
+  stroke2: "#acab6b",
 };
 
 const defaultConfig = JSON.parse(JSON.stringify(config));
@@ -178,11 +178,11 @@ const brandPresets = {
 };
 
 // ===================================================================
-// NUOVO: DATABASE DELLE ANIMAZIONI
+// NUOVO: DATABASE DELLE ANIMAZIONI (AGGIORNATO)
 // ===================================================================
 const animationPresets = {
   "Centro Pulsante": {
-    duration: 3, // Durata totale in secondi
+    duration: 3,
     events: [{ time: 0.5, x: 0.5, y: 0.5 }],
   },
   "Pioggia Lenta": {
@@ -209,11 +209,56 @@ const animationPresets = {
       { time: 1.7, x: 0.9, y: 0.5 },
     ],
   },
-  "Doppio Impulso": {
+  "Battito Umbro": {
+    duration: 6, // Durata totale leggermente più lunga
+    events: [
+      // Primo battito
+      { time: 0.2, x: 0.5, y: 0.5 },
+      { time: 0.4, x: 0.5, y: 0.5 },
+      // Secondo battito (dopo una pausa)
+      { time: 1.7, x: 0.5, y: 0.5 },
+      { time: 1.9, x: 0.5, y: 0.5 },
+      // Terzo battito (dopo una pausa)
+      { time: 3.2, x: 0.5, y: 0.5 },
+      { time: 3.4, x: 0.5, y: 0.5 },
+    ],
+  },
+  Fioritura: {
+    duration: 5,
+    events: [
+      { time: 0.1, x: 0.5, y: 0.5 }, // Centro
+      { time: 0.6, x: 0.5, y: 0.3 }, // Alto
+      { time: 0.7, x: 0.7, y: 0.5 }, // Destra
+      { time: 0.8, x: 0.5, y: 0.7 }, // Basso
+      { time: 0.9, x: 0.3, y: 0.5 }, // Sinistra
+    ],
+  },
+  "Le Colline Umbre": {
+    duration: 6,
+    events: [
+      { time: 0.2, x: 0.2, y: 0.85 },
+      { time: 0.5, x: 0.5, y: 0.9 },
+      { time: 0.8, x: 0.8, y: 0.8 },
+      { time: 1.5, x: 0.35, y: 0.75 },
+      { time: 1.9, x: 0.65, y: 0.8 },
+    ],
+  },
+  "Echi dal Borgo": {
     duration: 4,
     events: [
-      { time: 0.2, x: 0.2, y: 0.3 },
-      { time: 1.2, x: 0.8, y: 0.7 },
+      { time: 0.3, x: 0.2, y: 0.25 }, // Impulso principale
+      { time: 1.0, x: 0.8, y: 0.75 }, // Eco ritardato
+    ],
+  },
+  "Spirale Spirituale": {
+    duration: 5,
+    events: [
+      { time: 0.1, x: 0.5, y: 0.5 },
+      { time: 0.4, x: 0.65, y: 0.4 },
+      { time: 0.8, x: 0.6, y: 0.65 },
+      { time: 1.3, x: 0.35, y: 0.6 },
+      { time: 1.9, x: 0.25, y: 0.3 },
+      { time: 2.5, x: 0.75, y: 0.25 },
     ],
   },
 };
@@ -361,7 +406,7 @@ function draw() {
     fill(255, 255, 255, 200);
     textSize(min(width, height) * 0.1);
     textAlign(CENTER, CENTER);
-    textStyle(BOLD);
+    textStyle(NORMAL);
     text("PAUSA", width / 2, height / 2);
   }
 
