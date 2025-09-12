@@ -5,18 +5,19 @@ const config = {
   speedPrimary: 30,
   intervalPrimary: 0.3,
   strokePrimary: 80,
-  alphaPrimary: 0.8,
+  alphaPrimary: 0.7,
   decayFactorPrimary: 1.5,
   heartSizePrimary: 1,
+  maxWavesPrimary: 3,
 
   speedSecondary: 30,
   intervalSecondary: 0.2,
   strokeSecondary: 20,
-  alphaSecondary: 0.8,
+  alphaSecondary: 0.7,
   decayFactorSecondary: 1.5,
   heartSizeSecondary: 1,
+  maxWavesSecondary: 3,
 
-  maxWaves: 5,
   maxReflections: 2,
   alphaThreshold: 0.005,
   maxSources: 5,
@@ -28,8 +29,8 @@ const config = {
 
 const pal = {
   bg: "#ffffff",
-  stroke: "#385a3e",
-  stroke2: "#acab6b",
+  stroke: "#34553c",
+  stroke2: "#5bd44c",
 };
 
 const defaultConfig = JSON.parse(JSON.stringify(config));
@@ -43,13 +44,16 @@ let maxR;
 let waveLayer;
 const vectorPool = [];
 
-// ===================================================================
-// NUOVE VARIABILI PER L'ANIMAZIONE
-// ===================================================================
 let isPlayingAnimation = false;
 let animationTime = 0;
 let currentSequence = [];
 let nextEventIndex = 0;
+
+let isRecordingAnimation = false;
+let recordingStartTime = 0;
+let recordedEvents = [];
+let savedAnimationCount = 0;
+const userAnimationPresets = {}; // Oggetto per le animazioni salvate
 
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
@@ -75,13 +79,14 @@ const brandPresets = {
       alphaPrimary: 0.8,
       decayFactorPrimary: 2.0,
       heartSizePrimary: 1,
+      maxWavesPrimary: 3,
       speedSecondary: 50,
       intervalSecondary: 0.4,
       strokeSecondary: 25,
       alphaSecondary: 0.8,
-      decayFactorPrimary: 2.0,
+      decayFactorSecondary: 2.0,
       heartSizeSecondary: 1,
-      maxWaves: 3,
+      maxWavesSecondary: 3,
       maxReflections: 2,
     },
   },
@@ -93,13 +98,14 @@ const brandPresets = {
       alphaPrimary: 0.9,
       decayFactorPrimary: 0.8,
       heartSizePrimary: 0.8,
+      maxWavesPrimary: 5,
       speedSecondary: 120,
       intervalSecondary: 0.1,
       strokeSecondary: 15,
       alphaSecondary: 0.9,
       decayFactorPrimary: 0.8,
       heartSizeSecondary: 0.8,
-      maxWaves: 5,
+      maxWavesSecondary: 5,
       maxReflections: 1,
     },
   },
@@ -111,13 +117,14 @@ const brandPresets = {
       alphaPrimary: 0.4,
       decayFactorPrimary: 3.0,
       heartSizePrimary: 1.2,
+      maxWavesPrimary: 10,
       speedSecondary: 20,
       intervalSecondary: 0.8,
       strokeSecondary: 30,
       alphaSecondary: 0.4,
       decayFactorPrimary: 3.0,
       heartSizeSecondary: 1.2,
-      maxWaves: 10,
+      maxWavesSecondary: 10,
       maxReflections: 4,
     },
   },
@@ -129,13 +136,14 @@ const brandPresets = {
       alphaPrimary: 0.85,
       decayFactorPrimary: 2.5,
       heartSizePrimary: 1.5,
+      maxWavesPrimary: 5,
       speedSecondary: 40,
       intervalSecondary: 0.4,
       strokeSecondary: 60,
       alphaSecondary: 0.85,
       decayFactorPrimary: 2.5,
       heartSizeSecondary: 1.5,
-      maxWaves: 5,
+      maxWavesSecondary: 5,
       maxReflections: 2,
     },
   },
@@ -147,13 +155,14 @@ const brandPresets = {
       alphaPrimary: 0.2,
       decayFactorPrimary: 4.0,
       heartSizePrimary: 1,
+      maxWavesPrimary: 5,
       speedSecondary: 15,
       intervalSecondary: 1.5,
       strokeSecondary: 5,
       alphaSecondary: 0.2,
       decayFactorPrimary: 4.0,
       heartSizeSecondary: 1,
-      maxWaves: 5,
+      maxWavesSecondary: 5,
       maxReflections: 1,
     },
   },
@@ -165,22 +174,82 @@ const brandPresets = {
       alphaPrimary: 0.9,
       decayFactorPrimary: 1.5,
       heartSizePrimary: 0.5,
+      maxWavesPrimary: 7,
       speedSecondary: 25,
       intervalSecondary: 0.6,
       strokeSecondary: 90,
       alphaSecondary: 0.7,
-      decayFactorSecondary: 2.5,
+      decayFactorPrimary: 2.5,
       heartSizeSecondary: 2,
-      maxWaves: 7,
+      maxWavesSecondary: 7,
       maxReflections: 3,
     },
   },
 };
 
 // ===================================================================
-// NUOVO: DATABASE DELLE ANIMAZIONI (AGGIORNATO)
+// DATABASE DELLE ANIMAZIONI
 // ===================================================================
 const animationPresets = {
+  "Battito Umbro (Default)": {
+    duration: 8,
+    events: [
+      {
+        time: 0.5,
+        x: 0.5,
+        y: 0.5,
+        override: {
+          heartSizePrimary: 1.2,
+          speedPrimary: 50,
+          strokePrimary: 60,
+          maxWavesPrimary: 2,
+          heartSizeSecondary: 0.8,
+          speedSecondary: 40,
+          strokeSecondary: 20,
+          maxWavesSecondary: 1,
+        },
+      },
+      {
+        time: 1.2,
+        x: 0.5,
+        y: 0.5,
+        override: {
+          heartSizePrimary: 0.7,
+          speedPrimary: 150,
+          strokePrimary: 15,
+          maxWavesPrimary: 1,
+          waveDisplayMode: "primary",
+        },
+      },
+      {
+        time: 4.0,
+        x: 0.5,
+        y: 0.5,
+        override: {
+          heartSizePrimary: 1.2,
+          speedPrimary: 50,
+          strokePrimary: 60,
+          maxWavesPrimary: 2,
+          heartSizeSecondary: 0.8,
+          speedSecondary: 40,
+          strokeSecondary: 20,
+          maxWavesSecondary: 1,
+        },
+      },
+      {
+        time: 4.7,
+        x: 0.5,
+        y: 0.5,
+        override: {
+          heartSizePrimary: 0.7,
+          speedPrimary: 150,
+          strokePrimary: 15,
+          maxWavesPrimary: 1,
+          waveDisplayMode: "primary",
+        },
+      },
+    ],
+  },
   "Centro Pulsante": {
     duration: 3,
     events: [{ time: 0.5, x: 0.5, y: 0.5 }],
@@ -209,28 +278,22 @@ const animationPresets = {
       { time: 1.7, x: 0.9, y: 0.5 },
     ],
   },
-  "Battito Umbro": {
-    duration: 6, // Durata totale leggermente più lunga
-    events: [
-      // Primo battito
-      { time: 0.2, x: 0.5, y: 0.5 },
-      { time: 0.4, x: 0.5, y: 0.5 },
-      // Secondo battito (dopo una pausa)
-      { time: 1.7, x: 0.5, y: 0.5 },
-      { time: 1.9, x: 0.5, y: 0.5 },
-      // Terzo battito (dopo una pausa)
-      { time: 3.2, x: 0.5, y: 0.5 },
-      { time: 3.4, x: 0.5, y: 0.5 },
-    ],
-  },
   Fioritura: {
-    duration: 5,
+    duration: 6,
     events: [
-      { time: 0.1, x: 0.5, y: 0.5 }, // Centro
-      { time: 0.6, x: 0.5, y: 0.3 }, // Alto
-      { time: 0.7, x: 0.7, y: 0.5 }, // Destra
-      { time: 0.8, x: 0.5, y: 0.7 }, // Basso
-      { time: 0.9, x: 0.3, y: 0.5 }, // Sinistra
+      { time: 0.1, x: 0.5, y: 0.5 },
+      { time: 0.5, x: 0.5, y: 0.3 },
+      { time: 0.7, x: 0.7, y: 0.5 },
+      { time: 0.9, x: 0.5, y: 0.7 },
+      { time: 1.1, x: 0.3, y: 0.5 },
+      { time: 1.5, x: 0.78, y: 0.22 },
+      { time: 1.7, x: 0.9, y: 0.5 },
+      { time: 1.9, x: 0.78, y: 0.78 },
+      { time: 2.1, x: 0.5, y: 0.9 },
+      { time: 2.3, x: 0.22, y: 0.78 },
+      { time: 2.5, x: 0.1, y: 0.5 },
+      { time: 2.7, x: 0.22, y: 0.22 },
+      { time: 2.9, x: 0.5, y: 0.1 },
     ],
   },
   "Le Colline Umbre": {
@@ -246,8 +309,8 @@ const animationPresets = {
   "Echi dal Borgo": {
     duration: 4,
     events: [
-      { time: 0.3, x: 0.2, y: 0.25 }, // Impulso principale
-      { time: 1.0, x: 0.8, y: 0.75 }, // Eco ritardato
+      { time: 0.3, x: 0.2, y: 0.25 },
+      { time: 1.0, x: 0.8, y: 0.75 },
     ],
   },
   "Spirale Spirituale": {
@@ -355,23 +418,22 @@ function draw() {
   const dt = paused ? 0 : deltaTime / 1000;
   t += dt;
 
-  // LOGICA DELL'ANIMATORE
   if (isPlayingAnimation && !paused) {
     animationTime += dt;
-    // Controlla se ci sono eventi da eseguire
     if (
       nextEventIndex < currentSequence.events.length &&
       animationTime >= currentSequence.events[nextEventIndex].time
     ) {
       const event = currentSequence.events[nextEventIndex];
-      sources.unshift(new WaveSource(event.x * width, event.y * height));
+      sources.unshift(
+        new WaveSource(event.x * width, event.y * height, event.override)
+      );
       nextEventIndex++;
     }
-    // Ferma l'animazione alla fine
     if (animationTime >= currentSequence.duration) {
       isPlayingAnimation = false;
       document.getElementById("play-animation-btn").textContent =
-        "Play Animazione";
+        "Play Animazione Selezionata";
     }
   }
 
@@ -406,7 +468,7 @@ function draw() {
     fill(255, 255, 255, 200);
     textSize(min(width, height) * 0.1);
     textAlign(CENTER, CENTER);
-    textStyle(NORMAL);
+    textStyle(BOLD);
     text("PAUSA", width / 2, height / 2);
   }
 
@@ -414,20 +476,21 @@ function draw() {
 }
 
 // ===================================================================
-// WaveSource (invariato)
+// WaveSource
 // ===================================================================
 class WaveSource {
-  constructor(x, y) {
+  constructor(x, y, override = null) {
     this.pos = getPooledVector(x, y);
     this.t = 0;
     this.imageSources = [];
+    this.override = override;
     this.calculateImageSources();
   }
 
   calculateImageSources() {
     this.imageSources.forEach((s) => returnToPool(s.pos));
     this.imageSources = [];
-    const r = config.maxReflections;
+    const r = this.override?.maxReflections ?? config.maxReflections;
     for (let ix = -r; ix <= r; ix++) {
       for (let iy = -r; iy <= r; iy++) {
         const sx =
@@ -453,59 +516,39 @@ class WaveSource {
 
   drawWaveLayer(c) {
     let total = 0;
+    const waveDisplayMode =
+      this.override?.waveDisplayMode ?? config.waveDisplayMode;
 
-    if (
-      config.waveDisplayMode === "both" ||
-      config.waveDisplayMode === "primary"
-    ) {
-      total += this.drawWave(
-        this.imageSources,
-        config.speedPrimary,
-        config.intervalPrimary,
-        config.strokePrimary,
-        config.alphaPrimary,
-        pal.stroke,
-        config.decayFactorPrimary,
-        config.heartSizePrimary,
-        c
-      );
+    if (waveDisplayMode === "both" || waveDisplayMode === "primary") {
+      total += this.drawWave("primary", c);
     }
 
-    if (
-      config.waveDisplayMode === "both" ||
-      config.waveDisplayMode === "secondary"
-    ) {
-      total += this.drawWave(
-        this.imageSources,
-        config.speedSecondary,
-        config.intervalSecondary,
-        config.strokeSecondary,
-        config.alphaSecondary,
-        pal.stroke2,
-        config.decayFactorSecondary,
-        config.heartSizeSecondary,
-        c
-      );
+    if (waveDisplayMode === "both" || waveDisplayMode === "secondary") {
+      total += this.drawWave("secondary", c);
     }
 
     return total;
   }
 
-  drawWave(
-    imgSources,
-    speed,
-    interval,
-    strokeW,
-    alphaBase,
-    color,
-    decayFactor,
-    heartSize,
-    c
-  ) {
+  drawWave(type, c) {
+    const s = type === "primary" ? "Primary" : "Secondary";
+    const o = this.override;
+
+    const speed = o?.["speed" + s] ?? config["speed" + s];
+    const interval = o?.["interval" + s] ?? config["interval" + s];
+    const strokeW = o?.["stroke" + s] ?? config["stroke" + s];
+    const alphaBase = o?.["alpha" + s] ?? config["alpha" + s];
+    const color =
+      o?.["stroke" + (type === "primary" ? "" : "2")] ??
+      pal["stroke" + (type === "primary" ? "" : "2")];
+    const decayFactor = o?.["decayFactor" + s] ?? config["decayFactor" + s];
+    const heartSize = o?.["heartSize" + s] ?? config["heartSize" + s];
+    const maxWaves = o?.["maxWaves" + s] ?? config["maxWaves" + s];
+
     let wavesDrawn = 0;
     c.strokeWeight(strokeW);
-    for (const s of imgSources) {
-      for (let i = 0; i < config.maxWaves; i++) {
+    for (const s of this.imageSources) {
+      for (let i = 0; i < maxWaves; i++) {
         const r = speed * (this.t - i * interval);
         if (r < 0 || r > maxR) continue;
         if (!isHeartVisible(s.pos.x, s.pos.y, r * 2 * heartSize)) continue;
@@ -527,21 +570,27 @@ class WaveSource {
   }
 
   isAlive() {
-    const oldestWaveTime =
-      this.t -
-      (config.maxWaves - 1) *
-        Math.max(config.intervalPrimary, config.intervalSecondary);
-    if (oldestWaveTime < 0) return true;
-    const r_max =
-      Math.max(config.speedPrimary, config.speedSecondary) * oldestWaveTime;
-    return (
-      calcAlpha(
-        1.0,
-        r_max,
-        maxR,
-        Math.max(config.decayFactorPrimary, config.decayFactorSecondary)
-      ) > config.alphaThreshold
+    const maxWaves = Math.max(
+      this.override?.maxWavesPrimary ?? config.maxWavesPrimary,
+      this.override?.maxWavesSecondary ?? config.maxWavesSecondary
     );
+    const interval = Math.max(
+      this.override?.intervalPrimary ?? config.intervalPrimary,
+      this.override?.intervalSecondary ?? config.intervalSecondary
+    );
+    const speed = Math.max(
+      this.override?.speedPrimary ?? config.speedPrimary,
+      this.override?.speedSecondary ?? config.speedSecondary
+    );
+    const decay = Math.max(
+      this.override?.decayFactorPrimary ?? config.decayFactorPrimary,
+      this.override?.decayFactorSecondary ?? config.decayFactorSecondary
+    );
+
+    const oldestWaveTime = this.t - (maxWaves - 1) * interval;
+    if (oldestWaveTime < 0) return true;
+    const r_max = speed * oldestWaveTime;
+    return calcAlpha(1.0, r_max, maxR, decay) > config.alphaThreshold;
   }
 
   destroy() {
@@ -551,7 +600,7 @@ class WaveSource {
 }
 
 // ===================================================================
-// Funzioni di supporto (invariate)
+// Funzioni di supporto
 // ===================================================================
 function calcAlpha(base, r, maxR, decayFactor) {
   if (r <= 0) return 0;
@@ -667,19 +716,97 @@ function initializeUI() {
     }
   });
 
-  // NUOVO: GESTIONE PRESET ANIMAZIONE
   const animPresetSelect = document.getElementById("animation-preset-select");
+  const userAnimSelect = document.getElementById("user-animation-select");
   const playAnimBtn = document.getElementById("play-animation-btn");
+  const recordAnimBtn = document.getElementById("record-animation-btn");
+  const renameAnimBtn = document.getElementById("rename-animation-btn");
+  const deleteAnimBtn = document.getElementById("delete-animation-btn");
 
-  for (const name in animationPresets) {
-    const option = document.createElement("option");
-    option.value = name;
-    option.textContent = name;
-    animPresetSelect.appendChild(option);
+  function populateAnimationPresets() {
+    animPresetSelect.innerHTML = "";
+    for (const name in animationPresets) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      animPresetSelect.appendChild(option);
+    }
+  }
+  populateAnimationPresets();
+
+  function populateUserAnimationPresets() {
+    const currentVal = userAnimSelect.value;
+    userAnimSelect.innerHTML = '<option value="">-- Seleziona --</option>';
+    for (const name in userAnimationPresets) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      userAnimSelect.appendChild(option);
+    }
+    if (userAnimationPresets[currentVal]) {
+      userAnimSelect.value = currentVal;
+    }
+  }
+  populateUserAnimationPresets();
+
+  function updateManageButtons() {
+    const selectedAnim = userAnimSelect.value;
+    const isUserSaved = selectedAnim && userAnimationPresets[selectedAnim];
+    renameAnimBtn.disabled = !isUserSaved;
+    deleteAnimBtn.disabled = !isUserSaved;
   }
 
+  animPresetSelect.addEventListener("change", () => {
+    userAnimSelect.value = "";
+    updateManageButtons();
+  });
+  userAnimSelect.addEventListener("change", () => {
+    animPresetSelect.value = "";
+    updateManageButtons();
+  });
+  updateManageButtons();
+
   playAnimBtn.addEventListener("click", () => {
-    playAnimation(animPresetSelect.value);
+    const selectedDefault = animPresetSelect.value;
+    const selectedUser = userAnimSelect.value;
+    if (selectedDefault) playAnimation(selectedDefault);
+    if (selectedUser) playAnimation(selectedUser, true);
+  });
+
+  recordAnimBtn.addEventListener("click", toggleAnimationRecording);
+
+  renameAnimBtn.addEventListener("click", () => {
+    const oldName = userAnimSelect.value;
+    const newName = prompt(
+      "Inserisci il nuovo nome per l'animazione:",
+      oldName
+    );
+
+    if (newName && newName.trim() !== "" && newName !== oldName) {
+      if (userAnimationPresets[newName] || animationPresets[newName]) {
+        alert("Esiste già un'animazione con questo nome.");
+        return;
+      }
+      Object.defineProperty(
+        userAnimationPresets,
+        newName,
+        Object.getOwnPropertyDescriptor(userAnimationPresets, oldName)
+      );
+      delete userAnimationPresets[oldName];
+
+      populateUserAnimationPresets();
+      userAnimSelect.value = newName;
+      updateManageButtons();
+    }
+  });
+
+  deleteAnimBtn.addEventListener("click", () => {
+    const animToDelete = userAnimSelect.value;
+    if (confirm(`Sei sicuro di voler eliminare "${animToDelete}"?`)) {
+      delete userAnimationPresets[animToDelete];
+      populateUserAnimationPresets();
+      updateManageButtons();
+    }
   });
 
   document
@@ -763,8 +890,14 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  if (isPlayingAnimation) return; // Blocca il click durante l'animazione
+  if (isPlayingAnimation) return;
   if (event.target.classList.contains("p5Canvas")) {
+    if (isRecordingAnimation) {
+      const t = (millis() - recordingStartTime) / 1000;
+      recordedEvents.push({ time: t, x: mouseX / width, y: mouseY / height });
+      sources.unshift(new WaveSource(mouseX, mouseY));
+      return;
+    }
     if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
       if (sources.length < config.maxSources)
         sources.unshift(new WaveSource(mouseX, mouseY));
@@ -789,8 +922,9 @@ function togglePause() {
 }
 
 function clearSources() {
-  isPlayingAnimation = false; // Ferma anche l'animazione
-  document.getElementById("play-animation-btn").textContent = "Play Animazione";
+  isPlayingAnimation = false;
+  document.getElementById("play-animation-btn").textContent =
+    "Play Animazione Selezionata";
   sources.forEach((src) => src.destroy());
   sources = [];
   if (config.saveBackground) waveLayer.background(pal.bg);
@@ -816,14 +950,15 @@ function resetSimulation() {
   updateUIFromState();
 }
 
-// NUOVA FUNZIONE PER GESTIRE LE ANIMAZIONI
-function playAnimation(presetName) {
-  if (animationPresets[presetName]) {
+function playAnimation(presetName, isUserPreset = false) {
+  const preset = isUserPreset
+    ? userAnimationPresets[presetName]
+    : animationPresets[presetName];
+  if (preset) {
     clearSources();
     if (paused) togglePause();
 
-    currentSequence = animationPresets[presetName];
-    // Ordina gli eventi per tempo per sicurezza
+    currentSequence = preset;
     currentSequence.events.sort((a, b) => a.time - b.time);
 
     animationTime = 0;
@@ -831,6 +966,46 @@ function playAnimation(presetName) {
     isPlayingAnimation = true;
     document.getElementById("play-animation-btn").textContent =
       "In Esecuzione...";
+  }
+}
+
+function toggleAnimationRecording() {
+  isRecordingAnimation = !isRecordingAnimation;
+  const btn = document.getElementById("record-animation-btn");
+  const status = document.getElementById("record-status");
+  const userAnimSelect = document.getElementById("user-animation-select");
+
+  if (isRecordingAnimation) {
+    clearSources();
+    recordedEvents = [];
+    recordingStartTime = millis();
+    btn.textContent = "Ferma Registrazione";
+    btn.classList.add("recording");
+    status.textContent = "REC ●";
+  } else {
+    btn.textContent = "Registra Nuova Animazione";
+    btn.classList.remove("recording");
+    status.textContent = "";
+
+    if (recordedEvents.length > 0) {
+      savedAnimationCount++;
+      const newAnimationName = `Animazione Salvata ${savedAnimationCount}`;
+      const duration = (millis() - recordingStartTime) / 1000 + 3; // Aggiungi 3s di coda
+
+      userAnimationPresets[newAnimationName] = {
+        duration: duration,
+        events: recordedEvents,
+      };
+
+      const option = document.createElement("option");
+      option.value = newAnimationName;
+      option.textContent = newAnimationName;
+      userAnimSelect.appendChild(option);
+      userAnimSelect.value = newAnimationName;
+
+      document.getElementById("rename-animation-btn").disabled = false;
+      document.getElementById("delete-animation-btn").disabled = false;
+    }
   }
 }
 

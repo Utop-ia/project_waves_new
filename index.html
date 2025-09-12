@@ -35,12 +35,87 @@
           <div class="panel-content show">
             <div class="preset-group">
               <label for="animation-preset-select"
-                >Seleziona un'animazione</label
+                >Animazioni Predefinite</label
               >
               <select id="animation-preset-select"></select>
-              <button id="play-animation-btn" style="margin-top: 15px">
-                Play Animazione
+            </div>
+            <div class="preset-group">
+              <label for="user-animation-select">Le Tue Animazioni</label>
+              <div class="animation-controls">
+                <select id="user-animation-select"></select>
+                <div class="manage-buttons">
+                  <button id="rename-animation-btn" disabled>Rinomina</button>
+                  <button id="delete-animation-btn" disabled>Elimina</button>
+                </div>
+              </div>
+            </div>
+            <button id="play-animation-btn" style="margin-top: 5px">
+              Play Animazione Selezionata
+            </button>
+            <div
+              class="preset-group"
+              style="
+                margin-top: 20px;
+                border-top: 1px solid #eee;
+                padding-top: 20px;
+              "
+            >
+              <label for="record-animation-btn">Crea la tua animazione</label>
+              <button id="record-animation-btn">
+                Registra Nuova Animazione
               </button>
+              <p
+                id="record-status"
+                style="
+                  font-size: 12px;
+                  color: var(--danger-color);
+                  margin-top: 10px;
+                  text-align: center;
+                  height: 15px;
+                "
+              ></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="ui-panel">
+          <h2 class="panel-header">Impostazioni Generali</h2>
+          <div class="panel-content">
+            <div
+              class="slider-group"
+              data-key="maxSources"
+              data-target="config"
+            >
+              <label>Numero Sorgenti Max</label>
+              <div class="slider-input-wrapper">
+                <input type="range" min="1" max="20" step="1" value="5" />
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  value="5"
+                  class="value-input"
+                />
+              </div>
+            </div>
+            <div
+              class="slider-group"
+              data-key="maxReflections"
+              data-target="config"
+            >
+              <label>Numero Riflessioni</label>
+              <div class="slider-input-wrapper">
+                <input type="range" min="0" max="10" step="1" value="2" />
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value="2"
+                  class="value-input"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -120,6 +195,24 @@
         <div class="ui-panel">
           <h2 class="panel-header">Onde Primarie</h2>
           <div class="panel-content">
+            <div
+              class="slider-group"
+              data-key="maxWavesPrimary"
+              data-target="config"
+            >
+              <label>Numero Onde</label>
+              <div class="slider-input-wrapper">
+                <input type="range" min="1" max="20" step="1" value="5" />
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  value="5"
+                  class="value-input"
+                />
+              </div>
+            </div>
             <div
               class="slider-group"
               data-key="speedPrimary"
@@ -246,6 +339,24 @@
         <div class="ui-panel">
           <h2 class="panel-header">Onde Secondarie</h2>
           <div class="panel-content">
+            <div
+              class="slider-group"
+              data-key="maxWavesSecondary"
+              data-target="config"
+            >
+              <label>Numero Onde</label>
+              <div class="slider-input-wrapper">
+                <input type="range" min="1" max="20" step="1" value="5" />
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  value="5"
+                  class="value-input"
+                />
+              </div>
+            </div>
             <div
               class="slider-group"
               data-key="speedSecondary"
