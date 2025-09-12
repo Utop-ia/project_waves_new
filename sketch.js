@@ -179,7 +179,7 @@ const brandPresets = {
       intervalSecondary: 0.6,
       strokeSecondary: 90,
       alphaSecondary: 0.7,
-      decayFactorSecondary: 2.5,
+      decayFactorPrimary: 2.5,
       heartSizeSecondary: 2,
       maxWavesSecondary: 7,
       maxReflections: 3,
@@ -432,8 +432,7 @@ function draw() {
     }
     if (animationTime >= currentSequence.duration) {
       isPlayingAnimation = false;
-      document.getElementById("play-animation-btn").textContent =
-        "Play Animazione Selezionata";
+      document.getElementById("play-animation-btn").textContent = "Avvia";
     }
   }
 
@@ -761,7 +760,11 @@ function initializeUI() {
     updateManageButtons();
   });
   userAnimSelect.addEventListener("change", () => {
-    if (userAnimSelect.value !== "") animPresetSelect.value = "";
+    if (userAnimSelect.value !== "") {
+      // Find the first option in the default select and set it to that
+      const firstDefaultOption = animPresetSelect.querySelector("option");
+      if (firstDefaultOption) animPresetSelect.value = firstDefaultOption.value;
+    }
     updateManageButtons();
   });
   updateManageButtons();
@@ -769,8 +772,11 @@ function initializeUI() {
   playAnimBtn.addEventListener("click", () => {
     const selectedDefault = animPresetSelect.value;
     const selectedUser = userAnimSelect.value;
-    if (selectedDefault) playAnimation(selectedDefault);
-    if (selectedUser) playAnimation(selectedUser, true);
+    if (selectedUser) {
+      playAnimation(selectedUser, true);
+    } else if (selectedDefault) {
+      playAnimation(selectedDefault);
+    }
   });
 
   recordAnimBtn.addEventListener("click", toggleAnimationRecording);
@@ -1002,6 +1008,9 @@ function toggleAnimationRecording() {
       option.textContent = newAnimationName;
       userAnimSelect.appendChild(option);
       userAnimSelect.value = newAnimationName;
+
+      // Deseleziona il menu dei preset di default
+      document.getElementById("animation-preset-select").value = "";
 
       document.getElementById("rename-animation-btn").disabled = false;
       document.getElementById("delete-animation-btn").disabled = false;
