@@ -1124,27 +1124,27 @@ function updateExportStatus(message) {
 }
 
 function setProgress(pct) {
-  const bar = document.getElementById('progress-bar');
-  if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  const bar = document.getElementById("progress-bar");
+  if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
 }
 
 function setRecChip(isRec, label) {
-  const chip = document.getElementById('rec-chip');
+  const chip = document.getElementById("rec-chip");
   if (!chip) return;
-  chip.textContent = label || (isRec ? 'REC' : 'Pronto');
-  chip.classList.toggle('is-recording', !!isRec);
+  chip.textContent = label || (isRec ? "REC" : "Pronto");
+  chip.classList.toggle("is-recording", !!isRec);
 }
 
 function setProgress(pct) {
-  const bar = document.getElementById('progress-bar');
-  if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  const bar = document.getElementById("progress-bar");
+  if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
 }
 
 function setRecChip(isRec, label) {
-  const chip = document.getElementById('rec-chip');
+  const chip = document.getElementById("rec-chip");
   if (!chip) return;
-  chip.textContent = label || (isRec ? 'REC' : 'Pronto');
-  chip.classList.toggle('is-recording', !!isRec);
+  chip.textContent = label || (isRec ? "REC" : "Pronto");
+  chip.classList.toggle("is-recording", !!isRec);
 }
 
 function toggleUIAccess(enabled) {
@@ -1155,14 +1155,9 @@ function toggleUIAccess(enabled) {
     .forEach((el) => {
       if (
         isExporting &&
-        ((activeExportKind === 'ccapture' && el.id === 'record-video-btn') ||
-         (activeExportKind === 'media' && el.id === 'record-mp4-btn'))
+        ((activeExportKind === "ccapture" && el.id === "record-video-btn") ||
+          (activeExportKind === "media" && el.id === "record-mp4-btn"))
       ) {
-        el.disabled = false;
-      } else {
-        el.disabled = !enabled;
-      }
-    }) {
         el.disabled = false;
       } else {
         el.disabled = !enabled;
@@ -1206,7 +1201,6 @@ function toggleRecording() {
   }
 }
 
-
 // Toggle per MediaRecorder (MP4/WebM)
 function toggleMp4Recording() {
   if (!isExporting) {
@@ -1216,7 +1210,7 @@ function toggleMp4Recording() {
       return;
     }
     startMediaExport(anim);
-  } else if (activeExportKind === 'media') {
+  } else if (activeExportKind === "media") {
     // Richiesta di finalizzazione
     isExporting = false;
     updateExportStatus("Finalizzazione richiesta dall'utente...");
@@ -1232,32 +1226,50 @@ function startMediaExport(animOpt = null) {
     return;
   }
 
-  const canvasEl = (typeof p5Canvas !== 'undefined' && p5Canvas && p5Canvas.elt) ? p5Canvas.elt : document.querySelector('canvas');
+  const canvasEl =
+    typeof p5Canvas !== "undefined" && p5Canvas && p5Canvas.elt
+      ? p5Canvas.elt
+      : document.querySelector("canvas");
   if (!canvasEl) {
     alert("Canvas non trovato.");
     return;
   }
 
   // MIME preferito: H.264 MP4 se supportato, altrimenti WebM
-  const preferMp4 = (window.MediaRecorder && MediaRecorder.isTypeSupported('video/mp4;codecs=h264')) ||
-                    (window.MediaRecorder && MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E'));
+  const preferMp4 =
+    (window.MediaRecorder &&
+      MediaRecorder.isTypeSupported("video/mp4;codecs=h264")) ||
+    (window.MediaRecorder &&
+      MediaRecorder.isTypeSupported("video/mp4;codecs=avc1.42E01E"));
   const mime = preferMp4
-    ? (MediaRecorder.isTypeSupported('video/mp4;codecs=h264') ? 'video/mp4;codecs=h264' : 'video/mp4;codecs=avc1.42E01E')
-    : (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9'
-       : (MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : null));
+    ? MediaRecorder.isTypeSupported("video/mp4;codecs=h264")
+      ? "video/mp4;codecs=h264"
+      : "video/mp4;codecs=avc1.42E01E"
+    : MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+    ? "video/webm;codecs=vp9"
+    : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+    ? "video/webm;codecs=vp8"
+    : null;
 
   if (!mime) {
-    alert("MediaRecorder non supporta un formato video compatibile su questo browser.");
+    alert(
+      "MediaRecorder non supporta un formato video compatibile su questo browser."
+    );
     return;
   }
 
   const stream = canvasEl.captureStream(TARGET_FPS);
   recordedChunks = [];
   try {
-    mediaRecorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 20_000_000 });
+    mediaRecorder = new MediaRecorder(stream, {
+      mimeType: mime,
+      videoBitsPerSecond: 20_000_000,
+    });
   } catch (e) {
     console.error(e);
-    alert("Impossibile iniziare la registrazione MediaRecorder in questo browser.");
+    alert(
+      "Impossibile iniziare la registrazione MediaRecorder in questo browser."
+    );
     return;
   }
   mediaRecorder.ondataavailable = (ev) => {
@@ -1265,39 +1277,39 @@ function startMediaExport(animOpt = null) {
   };
   mediaRecorder.onstop = () => {
     const blob = new Blob(recordedChunks, { type: mime });
-    const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+    const ext = mime.includes("mp4") ? "mp4" : "webm";
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'animazione-onde.' + ext;
+    a.download = "animazione-onde." + ext;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-    const btn = document.getElementById('record-mp4-btn');
+    const btn = document.getElementById("record-mp4-btn");
     if (btn) {
-      btn.textContent = 'Esporta MP4 (auto-fallback a WebM)';
-      btn.classList.remove('recording');
+      btn.textContent = "Esporta MP4 (auto-fallback a WebM)";
+      btn.classList.remove("recording");
     }
     toggleUIAccess(true);
     isExporting = false;
     activeExportKind = null;
     clearSources();
     renderCanvas();
-    setRecChip(false, 'Pronto');
+    setRecChip(false, "Pronto");
     setProgress(100);
-    updateExportStatus('Video salvato!');
+    updateExportStatus("Video salvato!");
   };
 
   // UI state
   isExporting = true;
-  activeExportKind = 'media';
+  activeExportKind = "media";
   toggleUIAccess(false);
-  const btn = document.getElementById('record-mp4-btn');
+  const btn = document.getElementById("record-mp4-btn");
   if (btn) {
-    btn.textContent = 'Ferma e Salva';
-    btn.classList.add('recording');
+    btn.textContent = "Ferma e Salva";
+    btn.classList.add("recording");
   }
-  setRecChip(true, preferMp4 ? 'REC (MP4)' : 'REC (WebM)');
+  setRecChip(true, preferMp4 ? "REC (MP4)" : "REC (WebM)");
 
   // Reset simulazione + timeline
   clearSources();
@@ -1314,25 +1326,30 @@ function startMediaExport(animOpt = null) {
   let frameIndex = 0;
   let tailFrameIndex = 0;
   let holdFrameIndex = 0;
-  let phase = 'events';
+  let phase = "events";
 
   mediaRecorder.start();
 
   (function step() {
-    if (phase === 'events') {
+    if (phase === "events") {
       const tNow = frameIndex * FRAME_DT;
       while (
         nextEventIndex < sequence.events.length &&
         sequence.events[nextEventIndex].time <= tNow + EPS
       ) {
         const ev = sequence.events[nextEventIndex++];
-        sources.unshift(new WaveSource(ev.x * width, ev.y * height, ev.override));
+        sources.unshift(
+          new WaveSource(ev.x * width, ev.y * height, ev.override)
+        );
       }
       updateSimulation(FRAME_DT);
       renderCanvas();
 
       frameIndex++;
-      const progress = Math.min(100, Math.round(((frameIndex) / progressTotalFrames) * 100));
+      const progress = Math.min(
+        100,
+        Math.round((frameIndex / progressTotalFrames) * 100)
+      );
       setProgress(progress);
       updateExportStatus(`Rendering... ${progress}%`);
 
@@ -1340,39 +1357,48 @@ function startMediaExport(animOpt = null) {
         requestAnimationFrame(step);
         return;
       }
-      phase = 'tail';
+      phase = "tail";
     }
 
-    if (phase === 'tail') {
+    if (phase === "tail") {
       const alive = anySourceAlive();
       updateSimulation(FRAME_DT);
       renderCanvas();
       tailFrameIndex++;
-      const tailPct = Math.round(((totalFrames + tailFrameIndex) / progressTotalFrames) * 100);
+      const tailPct = Math.round(
+        ((totalFrames + tailFrameIndex) / progressTotalFrames) * 100
+      );
       setProgress(tailPct);
-      updateExportStatus(`Coda... ${Math.round((tailFrameIndex / maxTailFrames) * 100)}%`);
+      updateExportStatus(
+        `Coda... ${Math.round((tailFrameIndex / maxTailFrames) * 100)}%`
+      );
       if (!alive || tailFrameIndex >= maxTailFrames) {
-        phase = 'hold';
+        phase = "hold";
       }
       requestAnimationFrame(step);
       return;
     }
 
-    if (phase === 'hold') {
+    if (phase === "hold") {
       renderCanvas();
       holdFrameIndex++;
-      const holdPct = Math.round(((totalFrames + maxTailFrames + holdFrameIndex) / progressTotalFrames) * 100);
+      const holdPct = Math.round(
+        ((totalFrames + maxTailFrames + holdFrameIndex) / progressTotalFrames) *
+          100
+      );
       setProgress(holdPct);
       if (holdFrameIndex < holdFrames) {
         requestAnimationFrame(step);
         return;
       }
-      phase = 'done';
+      phase = "done";
     }
 
-    if (phase === 'done') {
+    if (phase === "done") {
       // Stop recorder e finalizza
-      try { mediaRecorder.stop(); } catch(e) {}
+      try {
+        mediaRecorder.stop();
+      } catch (e) {}
     }
   })();
 }
@@ -1386,7 +1412,7 @@ function startExport(format = "webm", animOpt = null) {
     return;
   }
 
-  activeExportKind = 'ccapture';
+  activeExportKind = "ccapture";
   capturer = new CCapture({
     format, // "webm" o "png" (png = sequenza zippata)
     framerate: TARGET_FPS,
@@ -1402,7 +1428,7 @@ function startExport(format = "webm", animOpt = null) {
   if (format === "webm") {
     btn.textContent = "Ferma e Salva";
     btn.classList.add("recording");
-    setRecChip(true, 'REC (WEBM)');
+    setRecChip(true, "REC (WEBM)");
   }
 
   // Reset simulazione e pre-elaborazione eventi
@@ -1449,7 +1475,7 @@ function startExport(format = "webm", animOpt = null) {
       frameIndex++;
       const progress = Math.min(
         100,
-        Math.round(((frameIndex) / progressTotalFrames) * 100)
+        Math.round((frameIndex / progressTotalFrames) * 100)
       );
       setProgress(progress);
       updateExportStatus(`Rendering... ${progress}%`);
@@ -1472,7 +1498,9 @@ function startExport(format = "webm", animOpt = null) {
       if (!alive || tailFrameIndex >= maxTailFrames) {
         phase = "hold";
       }
-      const tailPct = Math.round(((totalFrames + tailFrameIndex) / progressTotalFrames) * 100);
+      const tailPct = Math.round(
+        ((totalFrames + tailFrameIndex) / progressTotalFrames) * 100
+      );
       setProgress(tailPct);
       updateExportStatus(
         `Coda... ${Math.round((tailFrameIndex / maxTailFrames) * 100)}%`
@@ -1485,7 +1513,10 @@ function startExport(format = "webm", animOpt = null) {
       renderCanvas();
       capturer.capture(p5Canvas.elt);
       holdFrameIndex++;
-      const holdPct = Math.round(((totalFrames + maxTailFrames + holdFrameIndex) / progressTotalFrames) * 100);
+      const holdPct = Math.round(
+        ((totalFrames + maxTailFrames + holdFrameIndex) / progressTotalFrames) *
+          100
+      );
       setProgress(holdPct);
       if (holdFrameIndex < holdFrames) {
         requestAnimationFrame(step);
@@ -1514,7 +1545,7 @@ function finishRecording() {
   activeExportKind = null;
   clearSources();
   renderCanvas();
-  setRecChip(false, 'Pronto');
+  setRecChip(false, "Pronto");
   setProgress(100);
   updateExportStatus("Video salvato!");
 }
