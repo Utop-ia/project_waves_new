@@ -14,7 +14,7 @@ const config = {
   intervalSecondary: 0.2,
   strokeSecondary: 20,
   alphaSecondary: 0.8,
-  decayFactorSecondary: 1.5, // <---- ensure exists
+  decayFactorSecondary: 1.5,
   heartSizeSecondary: 1,
   maxWavesSecondary: 5,
 
@@ -36,6 +36,12 @@ const pal = {
 const defaultConfig = JSON.parse(JSON.stringify(config));
 const defaultPal = JSON.parse(JSON.stringify(pal));
 
+// ---- Export deterministico + parametri coda/hold
+const TARGET_FPS = 60;
+const FRAME_DT = 1 / TARGET_FPS;
+const MAX_TAIL_SECONDS = 6; // limite massimo per la coda
+const EXTRA_HOLD_SECONDS = 0.5; // piccolo fermo immagine finale
+
 let t = 0;
 let paused = false;
 let sources = [];
@@ -43,9 +49,7 @@ const stats = { fps: 0, sourcesCount: 0, wavesDrawn: 0 };
 let maxR;
 let waveLayer;
 const vectorPool = [];
-
-// ---- PATCH: riferimento canvas globale per CCapture
-let p5Canvas;
+let p5Canvas; // riferimento al canvas principale
 
 let isPlayingAnimation = false;
 let animationTime = 0;
@@ -58,8 +62,8 @@ let recordedEvents = [];
 let savedAnimationCount = 0;
 const userAnimationPresets = {};
 
-let capturer; // istanziato al momento della registrazione
-let isExporting = false; // Stato unificato per qualsiasi tipo di esportazione
+let capturer; // istanziato al momento dell’export
+let isExporting = false; // stato export (webm o png)
 
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
@@ -74,7 +78,7 @@ const returnToPool = (v) => {
 };
 
 // ===================================================================
-// PRESET DEGLI STATI DEL BRAND (con fix decayFactorSecondary)
+// PRESET DEGLI STATI DEL BRAND
 // ===================================================================
 const brandPresets = {
   "Flusso Armonico (Default)": {
@@ -91,7 +95,7 @@ const brandPresets = {
       intervalSecondary: 0.4,
       strokeSecondary: 25,
       alphaSecondary: 0.8,
-      decayFactorSecondary: 2.0, // FIX
+      decayFactorSecondary: 2.0,
       heartSizeSecondary: 1,
       maxWavesSecondary: 3,
 
@@ -112,7 +116,7 @@ const brandPresets = {
       intervalSecondary: 0.1,
       strokeSecondary: 15,
       alphaSecondary: 0.9,
-      decayFactorSecondary: 0.8, // FIX
+      decayFactorSecondary: 0.8,
       heartSizeSecondary: 0.8,
       maxWavesSecondary: 5,
 
@@ -133,7 +137,7 @@ const brandPresets = {
       intervalSecondary: 0.8,
       strokeSecondary: 30,
       alphaSecondary: 0.4,
-      decayFactorSecondary: 3.0, // FIX
+      decayFactorSecondary: 3.0,
       heartSizeSecondary: 1.2,
       maxWavesSecondary: 10,
 
@@ -154,7 +158,7 @@ const brandPresets = {
       intervalSecondary: 0.4,
       strokeSecondary: 60,
       alphaSecondary: 0.85,
-      decayFactorSecondary: 2.5, // FIX
+      decayFactorSecondary: 2.5,
       heartSizeSecondary: 1.5,
       maxWavesSecondary: 5,
 
@@ -175,7 +179,7 @@ const brandPresets = {
       intervalSecondary: 1.5,
       strokeSecondary: 5,
       alphaSecondary: 0.2,
-      decayFactorSecondary: 4.0, // FIX
+      decayFactorSecondary: 4.0,
       heartSizeSecondary: 1,
       maxWavesSecondary: 5,
 
@@ -196,7 +200,7 @@ const brandPresets = {
       intervalSecondary: 0.6,
       strokeSecondary: 90,
       alphaSecondary: 0.7,
-      decayFactorSecondary: 2.5, // FIX
+      decayFactorSecondary: 2.5,
       heartSizeSecondary: 2,
       maxWavesSecondary: 7,
 
@@ -374,7 +378,6 @@ function drawHeartShapeUniversal(c, x, y, size) {
 // ===================================================================
 function setup() {
   const canvasContainer = document.getElementById("canvas-container");
-  // ---- PATCH: conserva riferimento globale al canvas p5
   p5Canvas = createCanvas(
     canvasContainer.clientWidth,
     canvasContainer.clientHeight
@@ -391,8 +394,6 @@ function setup() {
 
   initializeUI();
   updateUIFromState();
-
-  // (PATCH) CCapture verrà istanziato on-demand all'avvio della registrazione
 }
 
 // ===================================================================
@@ -433,10 +434,10 @@ function applyCanvasZoom() {
 }
 
 // ===================================================================
-// Funzione di disegno principale (per interattività)
+// Disegno interattivo (runtime)
 // ===================================================================
 function draw() {
-  if (isExporting) return; // Se stiamo esportando, il rendering è gestito altrove
+  if (isExporting) return; // durante export usiamo il loop deterministico
 
   const dt = paused ? 0 : deltaTime / 1000;
   updateSimulation(dt);
@@ -444,7 +445,7 @@ function draw() {
 }
 
 // ===================================================================
-// Funzione che aggiorna lo stato della simulazione
+// Aggiorna simulazione
 // ===================================================================
 function updateSimulation(dt) {
   t += dt;
@@ -480,7 +481,7 @@ function updateSimulation(dt) {
 }
 
 // ===================================================================
-// Funzione che disegna il canvas
+// Render canvas (layering: nuovi sopra)
 // ===================================================================
 function renderCanvas() {
   if (config.saveBackground) {
@@ -490,7 +491,10 @@ function renderCanvas() {
   }
 
   stats.wavesDrawn = 0;
-  for (const src of sources) {
+
+  // Disegna sorgenti dalla più vecchia alla più recente (nuove sopra)
+  for (let i = sources.length - 1; i >= 0; i--) {
+    const src = sources[i];
     stats.wavesDrawn += src.drawWaveLayer(waveLayer);
   }
 
@@ -512,7 +516,7 @@ function renderCanvas() {
 }
 
 // ===================================================================
-// WaveSource Class
+// WaveSource
 // ===================================================================
 class WaveSource {
   constructor(x, y, override = null) {
@@ -564,8 +568,9 @@ class WaveSource {
   }
 
   drawWave(type, c) {
-    const suffix = type === "primary" ? "Primary" : "Secondary"; // PATCH: leggibilità
+    const suffix = type === "primary" ? "Primary" : "Secondary";
     const o = this.override;
+
     const speed = o?.["speed" + suffix] ?? config["speed" + suffix];
     const interval = o?.["interval" + suffix] ?? config["interval" + suffix];
     const strokeW = o?.["stroke" + suffix] ?? config["stroke" + suffix];
@@ -580,23 +585,28 @@ class WaveSource {
 
     let wavesDrawn = 0;
     c.strokeWeight(strokeW);
+
+    // Disegna onde dalla più vecchia alla più recente (recenti in primo piano)
     for (const imgSrc of this.imageSources) {
-      for (let i = 0; i < maxWaves; i++) {
+      for (let i = maxWaves - 1; i >= 0; i--) {
         const r = speed * (this.t - i * interval);
         if (r < 0 || r > maxR) continue;
         if (!isHeartVisible(imgSrc.pos.x, imgSrc.pos.y, r * 2 * heartSize))
           continue;
         const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
         if (alpha < config.alphaThreshold) continue;
+
         const hexAlpha = Math.floor(alpha * 255)
           .toString(16)
           .padStart(2, "0");
         c.stroke(`${color}${hexAlpha}`);
+
         c.push();
         c.translate(imgSrc.pos.x, imgSrc.pos.y);
         c.scale(imgSrc.scaleX, imgSrc.scaleY);
         drawHeartShapeUniversal(c, 0, 0, r * 2 * heartSize);
         c.pop();
+
         wavesDrawn++;
       }
     }
@@ -633,7 +643,7 @@ class WaveSource {
 }
 
 // ===================================================================
-// Funzioni di supporto
+// Supporto
 // ===================================================================
 function calcAlpha(base, r, maxR, decayFactor) {
   if (r <= 0) return 0;
@@ -653,8 +663,12 @@ function isHeartVisible(x, y, size) {
   );
 }
 
+function anySourceAlive() {
+  return sources.length > 0 && sources.some((s) => s.isAlive());
+}
+
 // ===================================================================
-// GESTIONE UI
+// UI
 // ===================================================================
 function initializeUI() {
   document.querySelectorAll(".panel-header").forEach((header) => {
@@ -742,9 +756,7 @@ function initializeUI() {
     if (brandPresets[presetName]) {
       const preset = brandPresets[presetName];
       Object.assign(config, JSON.parse(JSON.stringify(preset.config)));
-      if (preset.pal) {
-        Object.assign(pal, preset.pal);
-      }
+      if (preset.pal) Object.assign(pal, preset.pal);
       updateUIFromState();
     }
   });
@@ -853,9 +865,7 @@ function initializeUI() {
     .addEventListener("click", toggleRecording);
   document
     .getElementById("save-sequence-btn")
-    .addEventListener("click", () =>
-      alert("Funzione non ancora implementata.")
-    );
+    .addEventListener("click", () => startExport("png"));
 
   document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", () => {
@@ -1077,18 +1087,13 @@ function resizeCanvasAndContent(w, h) {
 }
 
 // ===================================================================
-// LOGICA DI ESPORTAZIONE (PATCHATA)
+// EXPORT (deterministico + coda + PNG sequence)
 // ===================================================================
-
 function saveSinglePNG() {
   if (isExporting) return;
   const g = createGraphics(width, height);
-  if (config.saveBackground) {
-    g.background(pal.bg);
-  }
+  if (config.saveBackground) g.background(pal.bg);
   g.image(waveLayer, 0, 0);
-
-  // Prova a usare p5 saveCanvas; fallback DOM se non supportato
   try {
     saveCanvas(g, "onda_singola", "png");
   } catch (e) {
@@ -1118,7 +1123,6 @@ function toggleUIAccess(enabled) {
       "#ui-sidebar button, #ui-sidebar input, #ui-sidebar select"
     )
     .forEach((el) => {
-      // Permetti al pulsante di registrazione di essere cliccato per fermare
       if (el.id === "record-video-btn" && isExporting) {
         el.disabled = false;
       } else {
@@ -1148,103 +1152,154 @@ function getSelectedAnimation() {
   return null;
 }
 
+// Avvio/stop export video (usa il motore generico)
 function toggleRecording() {
   if (!isExporting) {
-    // ---- INIZIA A REGISTRARE ----
     const anim = getSelectedAnimation();
     if (!anim) {
       alert("Per favore, seleziona un'animazione da registrare.");
       return;
     }
-
-    // PATCH: re-instanzia CCapture ogni volta
-    capturer = new CCapture({
-      format: "webm",
-      framerate: 60,
-      verbose: false,
-      name: "animazione-onde",
-      quality: 98,
-    });
-
-    isExporting = true;
-    toggleUIAccess(false);
-    updateExportStatus("Preparazione rendering...");
-    const btn = document.getElementById("record-video-btn");
-    btn.textContent = "Ferma e Salva";
-    btn.classList.add("recording");
-
-    clearSources();
-    capturer.start();
-
-    let time = 0;
-    let nextEventIndex = 0;
-    const frameDuration = 1 / 60; // 60 FPS
-    const sequence = JSON.parse(JSON.stringify(anim));
-    sequence.events.sort((a, b) => a.time - b.time);
-
-    function renderAndCapture() {
-      if (!isExporting) {
-        // Se l'utente ha premuto "Ferma"
-        finishRecording();
-        return;
-      }
-
-      // Aggiorna la simulazione a questo preciso istante
-      while (
-        nextEventIndex < sequence.events.length &&
-        time >= sequence.events[nextEventIndex].time
-      ) {
-        const event = sequence.events[nextEventIndex];
-        sources.unshift(
-          new WaveSource(event.x * width, event.y * height, event.override)
-        );
-        nextEventIndex++;
-      }
-      updateSimulation(frameDuration);
-      renderCanvas();
-
-      // PATCH: cattura il canvas giusto
-      capturer.capture(p5Canvas.elt);
-
-      time += frameDuration;
-
-      if (time < sequence.duration) {
-        const progress = Math.round((time / sequence.duration) * 100);
-        updateExportStatus(`Rendering... ${progress}%`);
-        requestAnimationFrame(renderAndCapture); // Prossimo frame
-      } else {
-        isExporting = false; // L'animazione è finita
-        finishRecording();
-      }
-    }
-
-    renderAndCapture(); // Inizia il ciclo di rendering manuale
+    startExport("webm", anim);
   } else {
-    // ---- FERMA LA REGISTRAZIONE (azione utente) ----
     isExporting = false;
     updateExportStatus("Finalizzazione richiesta dall'utente...");
   }
 }
 
+// Motore export generico: format = "webm" o "png"
+function startExport(format = "webm", animOpt = null) {
+  if (isExporting) return;
+
+  const anim = animOpt || getSelectedAnimation();
+  if (!anim) {
+    alert("Per favore, seleziona un'animazione da esportare.");
+    return;
+  }
+
+  capturer = new CCapture({
+    format, // "webm" o "png" (png = sequenza zippata)
+    framerate: TARGET_FPS,
+    verbose: false,
+    name: format === "png" ? "sequenza-onde" : "animazione-onde",
+    quality: 98,
+  });
+
+  isExporting = true;
+  toggleUIAccess(false);
+  updateExportStatus("Preparazione rendering...");
+  const btn = document.getElementById("record-video-btn");
+  if (format === "webm") {
+    btn.textContent = "Ferma e Salva";
+    btn.classList.add("recording");
+  }
+
+  // Reset simulazione e pre-elaborazione eventi
+  clearSources();
+  const sequence = JSON.parse(JSON.stringify(anim));
+  sequence.events.sort((a, b) => a.time - b.time);
+
+  let nextEventIndex = 0;
+  const totalFrames = Math.round(sequence.duration * TARGET_FPS);
+  const maxTailFrames = Math.round(MAX_TAIL_SECONDS * TARGET_FPS);
+  const holdFrames = Math.round(EXTRA_HOLD_SECONDS * TARGET_FPS);
+
+  let frameIndex = 0;
+  let tailFrameIndex = 0;
+  let holdFrameIndex = 0;
+  let phase = "events"; // events -> tail -> hold -> done
+
+  capturer.start();
+
+  (function step() {
+    if (!isExporting) {
+      finishRecording();
+      return;
+    }
+
+    if (phase === "events") {
+      const tNow = frameIndex * FRAME_DT;
+      // Emetti eventi fino a tNow
+      while (
+        nextEventIndex < sequence.events.length &&
+        sequence.events[nextEventIndex].time <= tNow
+      ) {
+        const ev = sequence.events[nextEventIndex++];
+        sources.unshift(
+          new WaveSource(ev.x * width, ev.y * height, ev.override)
+        );
+      }
+      updateSimulation(FRAME_DT);
+      renderCanvas();
+      capturer.capture(p5Canvas.elt);
+
+      frameIndex++;
+      const progress = Math.min(
+        100,
+        Math.round((frameIndex / totalFrames) * 100)
+      );
+      updateExportStatus(`Rendering... ${progress}%`);
+
+      if (frameIndex < totalFrames) {
+        setTimeout(step, 0);
+        return;
+      }
+      // Passa alla coda (nessun nuovo evento)
+      phase = "tail";
+    }
+
+    if (phase === "tail") {
+      const alive = anySourceAlive();
+      updateSimulation(FRAME_DT);
+      renderCanvas();
+      capturer.capture(p5Canvas.elt);
+      tailFrameIndex++;
+
+      if (!alive || tailFrameIndex >= maxTailFrames) {
+        phase = "hold";
+      }
+      updateExportStatus(
+        `Coda... ${Math.round((tailFrameIndex / maxTailFrames) * 100)}%`
+      );
+      setTimeout(step, 0);
+      return;
+    }
+
+    if (phase === "hold") {
+      renderCanvas();
+      capturer.capture(p5Canvas.elt);
+      holdFrameIndex++;
+      if (holdFrameIndex < holdFrames) {
+        setTimeout(step, 0);
+        return;
+      }
+      phase = "done";
+    }
+
+    if (phase === "done") {
+      isExporting = false;
+      finishRecording();
+    }
+  })();
+}
+
 function finishRecording() {
   updateExportStatus("Elaborazione video... Attendere.");
   capturer.stop();
-  // PATCH: versione compatibile (senza callback)
   capturer.save();
 
-  // Cleanup e reset della UI
   const btn = document.getElementById("record-video-btn");
   btn.textContent = "Registra Video (.webm)";
   btn.classList.remove("recording");
   toggleUIAccess(true);
   isExporting = false;
   clearSources();
-  renderCanvas(); // Pulisce il canvas mostrandolo vuoto
+  renderCanvas();
   updateExportStatus("Video salvato!");
 }
 
 // ===================================================================
-// Funzioni finali
+// Finali
 // ===================================================================
 function windowResized() {
   if (isExporting) return;
