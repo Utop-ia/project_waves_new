@@ -41,6 +41,7 @@ const TARGET_FPS = 60;
 const FRAME_DT = 1 / TARGET_FPS;
 const MAX_TAIL_SECONDS = 6; // limite massimo per la coda
 const EXTRA_HOLD_SECONDS = 0.5; // piccolo fermo immagine finale
+const EPS = 1e-6; // tolleranza per confronti temporali
 
 let t = 0;
 let paused = false;
@@ -63,9 +64,6 @@ let savedAnimationCount = 0;
 const userAnimationPresets = {};
 
 let capturer; // istanziato al momento dell’export
-let mediaRecorder = null; // MediaRecorder per MP4/WebM
-let recordedChunks = [];
-let activeExportKind = null; // 'ccapture' | 'media'
 let isExporting = false; // stato export (webm o png)
 
 const getPooledVector = (x, y) => {
@@ -866,13 +864,13 @@ function initializeUI() {
   document
     .getElementById("record-video-btn")
     .addEventListener("click", toggleRecording);
-  const mp4BtnEl = document.getElementById("record-mp4-btn");
-  if (mp4BtnEl) mp4BtnEl.addEventListener("click", toggleMp4Recording);
   document
-    .getElementById("save-sequence-btn")
-    .addEventListener("click", () => startExport("png"));
+    .getElementById("save-sequence-btn").addEventListener("click", () => startExport("png"));
 
-  document.getElementById("pause-btn").addEventListener("click", togglePause);
+  // Nuovi pulsanti Offline CFR
+  document.getElementById("offline-webm-btn").addEventListener("click", () => startExportOffline("webm"));
+  document.getElementById("offline-png-btn").addEventListener("click", () => startExportOffline("png"));
+document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", () => {
     isPlayingAnimation = false;
     currentSequence = null;
@@ -1119,32 +1117,7 @@ function saveSinglePNG() {
 }
 
 function updateExportStatus(message) {
-  const el = document.getElementById("export-status");
-  if (el) el.textContent = message;
-}
-
-function setProgress(pct) {
-  const bar = document.getElementById("progress-bar");
-  if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
-}
-
-function setRecChip(isRec, label) {
-  const chip = document.getElementById("rec-chip");
-  if (!chip) return;
-  chip.textContent = label || (isRec ? "REC" : "Pronto");
-  chip.classList.toggle("is-recording", !!isRec);
-}
-
-function setProgress(pct) {
-  const bar = document.getElementById("progress-bar");
-  if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + "%";
-}
-
-function setRecChip(isRec, label) {
-  const chip = document.getElementById("rec-chip");
-  if (!chip) return;
-  chip.textContent = label || (isRec ? "REC" : "Pronto");
-  chip.classList.toggle("is-recording", !!isRec);
+  document.getElementById("export-status").textContent = message;
 }
 
 function toggleUIAccess(enabled) {
@@ -1153,11 +1126,7 @@ function toggleUIAccess(enabled) {
       "#ui-sidebar button, #ui-sidebar input, #ui-sidebar select"
     )
     .forEach((el) => {
-      if (
-        isExporting &&
-        ((activeExportKind === "ccapture" && el.id === "record-video-btn") ||
-          (activeExportKind === "media" && el.id === "record-mp4-btn"))
-      ) {
+      if (el.id === "record-video-btn" && isExporting) {
         el.disabled = false;
       } else {
         el.disabled = !enabled;
@@ -1201,207 +1170,6 @@ function toggleRecording() {
   }
 }
 
-// Toggle per MediaRecorder (MP4/WebM)
-function toggleMp4Recording() {
-  if (!isExporting) {
-    const anim = getSelectedAnimation();
-    if (!anim) {
-      alert("Per favore, seleziona un'animazione da registrare.");
-      return;
-    }
-    startMediaExport(anim);
-  } else if (activeExportKind === "media") {
-    // Richiesta di finalizzazione
-    isExporting = false;
-    updateExportStatus("Finalizzazione richiesta dall'utente...");
-  }
-}
-
-// MediaRecorder export con stepping deterministico basato su rAF
-function startMediaExport(animOpt = null) {
-  if (isExporting) return;
-  const anim = animOpt || getSelectedAnimation();
-  if (!anim) {
-    alert("Per favore, seleziona un'animazione da esportare.");
-    return;
-  }
-
-  const canvasEl =
-    typeof p5Canvas !== "undefined" && p5Canvas && p5Canvas.elt
-      ? p5Canvas.elt
-      : document.querySelector("canvas");
-  if (!canvasEl) {
-    alert("Canvas non trovato.");
-    return;
-  }
-
-  // MIME preferito: H.264 MP4 se supportato, altrimenti WebM
-  const preferMp4 =
-    (window.MediaRecorder &&
-      MediaRecorder.isTypeSupported("video/mp4;codecs=h264")) ||
-    (window.MediaRecorder &&
-      MediaRecorder.isTypeSupported("video/mp4;codecs=avc1.42E01E"));
-  const mime = preferMp4
-    ? MediaRecorder.isTypeSupported("video/mp4;codecs=h264")
-      ? "video/mp4;codecs=h264"
-      : "video/mp4;codecs=avc1.42E01E"
-    : MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-    ? "video/webm;codecs=vp8"
-    : null;
-
-  if (!mime) {
-    alert(
-      "MediaRecorder non supporta un formato video compatibile su questo browser."
-    );
-    return;
-  }
-
-  const stream = canvasEl.captureStream(TARGET_FPS);
-  recordedChunks = [];
-  try {
-    mediaRecorder = new MediaRecorder(stream, {
-      mimeType: mime,
-      videoBitsPerSecond: 20_000_000,
-    });
-  } catch (e) {
-    console.error(e);
-    alert(
-      "Impossibile iniziare la registrazione MediaRecorder in questo browser."
-    );
-    return;
-  }
-  mediaRecorder.ondataavailable = (ev) => {
-    if (ev.data && ev.data.size) recordedChunks.push(ev.data);
-  };
-  mediaRecorder.onstop = () => {
-    const blob = new Blob(recordedChunks, { type: mime });
-    const ext = mime.includes("mp4") ? "mp4" : "webm";
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "animazione-onde." + ext;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-    const btn = document.getElementById("record-mp4-btn");
-    if (btn) {
-      btn.textContent = "Esporta MP4 (auto-fallback a WebM)";
-      btn.classList.remove("recording");
-    }
-    toggleUIAccess(true);
-    isExporting = false;
-    activeExportKind = null;
-    clearSources();
-    renderCanvas();
-    setRecChip(false, "Pronto");
-    setProgress(100);
-    updateExportStatus("Video salvato!");
-  };
-
-  // UI state
-  isExporting = true;
-  activeExportKind = "media";
-  toggleUIAccess(false);
-  const btn = document.getElementById("record-mp4-btn");
-  if (btn) {
-    btn.textContent = "Ferma e Salva";
-    btn.classList.add("recording");
-  }
-  setRecChip(true, preferMp4 ? "REC (MP4)" : "REC (WebM)");
-
-  // Reset simulazione + timeline
-  clearSources();
-  const sequence = JSON.parse(JSON.stringify(anim));
-  sequence.events.sort((a, b) => a.time - b.time);
-
-  let nextEventIndex = 0;
-  const EPS = 1e-6;
-  const totalFrames = Math.ceil(sequence.duration * TARGET_FPS);
-  const maxTailFrames = Math.round(MAX_TAIL_SECONDS * TARGET_FPS);
-  const holdFrames = Math.round(EXTRA_HOLD_SECONDS * TARGET_FPS);
-  const progressTotalFrames = totalFrames + maxTailFrames + holdFrames;
-
-  let frameIndex = 0;
-  let tailFrameIndex = 0;
-  let holdFrameIndex = 0;
-  let phase = "events";
-
-  mediaRecorder.start();
-
-  (function step() {
-    if (phase === "events") {
-      const tNow = frameIndex * FRAME_DT;
-      while (
-        nextEventIndex < sequence.events.length &&
-        sequence.events[nextEventIndex].time <= tNow + EPS
-      ) {
-        const ev = sequence.events[nextEventIndex++];
-        sources.unshift(
-          new WaveSource(ev.x * width, ev.y * height, ev.override)
-        );
-      }
-      updateSimulation(FRAME_DT);
-      renderCanvas();
-
-      frameIndex++;
-      const progress = Math.min(
-        100,
-        Math.round((frameIndex / progressTotalFrames) * 100)
-      );
-      setProgress(progress);
-      updateExportStatus(`Rendering... ${progress}%`);
-
-      if (frameIndex < totalFrames) {
-        requestAnimationFrame(step);
-        return;
-      }
-      phase = "tail";
-    }
-
-    if (phase === "tail") {
-      const alive = anySourceAlive();
-      updateSimulation(FRAME_DT);
-      renderCanvas();
-      tailFrameIndex++;
-      const tailPct = Math.round(
-        ((totalFrames + tailFrameIndex) / progressTotalFrames) * 100
-      );
-      setProgress(tailPct);
-      updateExportStatus(
-        `Coda... ${Math.round((tailFrameIndex / maxTailFrames) * 100)}%`
-      );
-      if (!alive || tailFrameIndex >= maxTailFrames) {
-        phase = "hold";
-      }
-      requestAnimationFrame(step);
-      return;
-    }
-
-    if (phase === "hold") {
-      renderCanvas();
-      holdFrameIndex++;
-      const holdPct = Math.round(
-        ((totalFrames + maxTailFrames + holdFrameIndex) / progressTotalFrames) *
-          100
-      );
-      setProgress(holdPct);
-      if (holdFrameIndex < holdFrames) {
-        requestAnimationFrame(step);
-        return;
-      }
-      phase = "done";
-    }
-
-    if (phase === "done") {
-      // Stop recorder e finalizza
-      try {
-        mediaRecorder.stop();
-      } catch (e) {}
-    }
-  })();
-}
 // Motore export generico: format = "webm" o "png"
 function startExport(format = "webm", animOpt = null) {
   if (isExporting) return;
@@ -1412,7 +1180,6 @@ function startExport(format = "webm", animOpt = null) {
     return;
   }
 
-  activeExportKind = "ccapture";
   capturer = new CCapture({
     format, // "webm" o "png" (png = sequenza zippata)
     framerate: TARGET_FPS,
@@ -1428,7 +1195,6 @@ function startExport(format = "webm", animOpt = null) {
   if (format === "webm") {
     btn.textContent = "Ferma e Salva";
     btn.classList.add("recording");
-    setRecChip(true, "REC (WEBM)");
   }
 
   // Reset simulazione e pre-elaborazione eventi
@@ -1437,11 +1203,9 @@ function startExport(format = "webm", animOpt = null) {
   sequence.events.sort((a, b) => a.time - b.time);
 
   let nextEventIndex = 0;
-  const EPS = 1e-6;
   const totalFrames = Math.ceil(sequence.duration * TARGET_FPS);
-  const maxTailFrames = Math.round(MAX_TAIL_SECONDS * TARGET_FPS);
-  const holdFrames = Math.round(EXTRA_HOLD_SECONDS * TARGET_FPS);
-  const progressTotalFrames = totalFrames + maxTailFrames + holdFrames;
+  const maxTailFrames = Math.ceil(MAX_TAIL_SECONDS * TARGET_FPS);
+  const holdFrames = Math.ceil(EXTRA_HOLD_SECONDS * TARGET_FPS);
 
   let frameIndex = 0;
   let tailFrameIndex = 0;
@@ -1475,9 +1239,8 @@ function startExport(format = "webm", animOpt = null) {
       frameIndex++;
       const progress = Math.min(
         100,
-        Math.round((frameIndex / progressTotalFrames) * 100)
+        Math.round((frameIndex / totalFrames) * 100)
       );
-      setProgress(progress);
       updateExportStatus(`Rendering... ${progress}%`);
 
       if (frameIndex < totalFrames) {
@@ -1498,10 +1261,6 @@ function startExport(format = "webm", animOpt = null) {
       if (!alive || tailFrameIndex >= maxTailFrames) {
         phase = "hold";
       }
-      const tailPct = Math.round(
-        ((totalFrames + tailFrameIndex) / progressTotalFrames) * 100
-      );
-      setProgress(tailPct);
       updateExportStatus(
         `Coda... ${Math.round((tailFrameIndex / maxTailFrames) * 100)}%`
       );
@@ -1513,11 +1272,6 @@ function startExport(format = "webm", animOpt = null) {
       renderCanvas();
       capturer.capture(p5Canvas.elt);
       holdFrameIndex++;
-      const holdPct = Math.round(
-        ((totalFrames + maxTailFrames + holdFrameIndex) / progressTotalFrames) *
-          100
-      );
-      setProgress(holdPct);
       if (holdFrameIndex < holdFrames) {
         requestAnimationFrame(step);
         return;
@@ -1542,14 +1296,134 @@ function finishRecording() {
   btn.classList.remove("recording");
   toggleUIAccess(true);
   isExporting = false;
-  activeExportKind = null;
   clearSources();
   renderCanvas();
-  setRecChip(false, "Pronto");
-  setProgress(100);
   updateExportStatus("Video salvato!");
 }
 
+
+// ===================================================================
+// Export Offline CFR (deterministico, non legato al vsync)
+// ===================================================================
+async function startExportOffline(format = "png", animOpt = null) {
+  if (isExporting) return;
+
+  const anim = animOpt || getSelectedAnimation();
+  if (!anim) {
+    alert("Per favore, seleziona un'animazione da esportare.");
+    return;
+  }
+
+  capturer = new CCapture({
+    format, // "webm" o "png"
+    framerate: TARGET_FPS,
+    verbose: false,
+    name: format === "png" ? "sequenza-onde" : "animazione-onde",
+    quality: 98,
+  });
+
+  // Reset simulazione e pre-elaborazione eventi
+  clearSources();
+  const sequence = JSON.parse(JSON.stringify(anim));
+  sequence.events.sort((a, b) => a.time - b.time);
+
+  let nextEventIndex = 0;
+  const totalFrames = Math.ceil(sequence.duration * TARGET_FPS);
+  const maxTailFrames = Math.ceil(MAX_TAIL_SECONDS * TARGET_FPS);
+  const holdFrames = Math.ceil(EXTRA_HOLD_SECONDS * TARGET_FPS);
+
+  let frameIndex = 0;
+  let tailFrameIndex = 0;
+  let holdFrameIndex = 0;
+  let phase = "events"; // events -> tail -> hold -> done
+
+  isExporting = true;
+  toggleUIAccess(false);
+  updateExportStatus("Preparazione export offline…");
+  capturer.start();
+
+  const CHUNK = 120; // numero di frame per batch, evita blocchi UI e non perde frame
+
+  // Helper per cedere il controllo al browser
+  const yieldToBrowser = () => new Promise((r) => setTimeout(r, 0));
+
+  while (isExporting && phase !== "done") {
+    if (phase === "events") {
+      let processed = 0;
+      while (isExporting && frameIndex < totalFrames && processed < CHUNK) {
+        const tNow = frameIndex * FRAME_DT;
+        while (
+          nextEventIndex < sequence.events.length &&
+          sequence.events[nextEventIndex].time <= tNow + EPS
+        ) {
+          const ev = sequence.events[nextEventIndex++];
+          sources.unshift(
+            new WaveSource(ev.x * width, ev.y * height, ev.override)
+          );
+        }
+        updateSimulation(FRAME_DT);
+        renderCanvas();
+        capturer.capture(p5Canvas.elt);
+        frameIndex++;
+        processed++;
+      }
+      const progress = Math.min(
+        100,
+        Math.round((frameIndex / totalFrames) * 100)
+      );
+      updateExportStatus(`Rendering (offline)… ${progress}%`);
+      if (frameIndex < totalFrames) {
+        await yieldToBrowser();
+        continue;
+      }
+      phase = "tail";
+      continue;
+    }
+
+    if (phase === "tail") {
+      let processed = 0;
+      while (
+        isExporting &&
+        tailFrameIndex < maxTailFrames &&
+        anySourceAlive() &&
+        processed < CHUNK
+      ) {
+        updateSimulation(FRAME_DT);
+        renderCanvas();
+        capturer.capture(p5Canvas.elt);
+        tailFrameIndex++;
+        processed++;
+      }
+      if (tailFrameIndex < maxTailFrames && anySourceAlive()) {
+        await yieldToBrowser();
+        continue;
+      }
+      phase = "hold";
+      continue;
+    }
+
+    if (phase === "hold") {
+      while (isExporting && holdFrameIndex < holdFrames) {
+        renderCanvas();
+        capturer.capture(p5Canvas.elt);
+        holdFrameIndex++;
+      }
+      phase = "done";
+      continue;
+    }
+  }
+
+  if (!isExporting) return;
+
+  updateExportStatus("Finalizzazione…");
+  capturer.stop();
+  capturer.save();
+  toggleUIAccess(true);
+  isExporting = false;
+  clearSources();
+  renderCanvas();
+  updateExportStatus("Export offline completato!");
+}
 // ===================================================================
 // Finali
 // ===================================================================
@@ -1575,3 +1449,7 @@ function updateStats() {
     statsDisplay.children[2].textContent = `Onde: ${stats.wavesDrawn}`;
   }
 }
+
+// Fallback: add listeners at end
+ document.getElementById("offline-webm-btn").addEventListener("click", () => startExportOffline("webm"));
+ document.getElementById("offline-png-btn").addEventListener("click", () => startExportOffline("png"));
