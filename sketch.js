@@ -929,8 +929,7 @@ function togglePause() {
 
 function clearSources() {
   isPlayingAnimation = false;
-  document.getElementById("play-animation-btn").textContent =
-    "Play Animazione Selezionata";
+  document.getElementById("play-animation-btn").textContent = "Avvia";
   sources.forEach((src) => src.destroy());
   sources = [];
   if (config.saveBackground) waveLayer.background(pal.bg);
