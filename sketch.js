@@ -89,7 +89,7 @@ const brandPresets = {
       intervalSecondary: 0.4,
       strokeSecondary: 25,
       alphaSecondary: 0.8,
-      decayFactorSecondary: 2.0,
+      decayFactorPrimary: 2.0,
       heartSizeSecondary: 1,
       maxWavesSecondary: 3,
       maxReflections: 2,
@@ -919,7 +919,7 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  if (isPlayingAnimation || isRecordingAnimation) return;
+  if (isPlayingAnimation) return;
   if (event.target.classList.contains("p5Canvas")) {
     if (isRecordingAnimation) {
       const t = (millis() - recordingStartTime) / 1000;
@@ -937,7 +937,6 @@ function mousePressed(event) {
 function keyPressed() {
   if (document.activeElement.tagName === "INPUT") return;
   if (key === " ") togglePause();
-  if (key === "s" || key === "S") saveSinglePNG();
   if (key === "c" || key === "C") clearSources();
   if (key === "r" || key === "R") resetSimulation();
 }
@@ -1059,14 +1058,10 @@ function resizeCanvasAndContent(w, h) {
 // ===================================================================
 function saveSinglePNG() {
   const tempCanvas = createGraphics(width, height);
-  if (config.saveBackground) tempCanvas.background(pal.bg);
-
-  // Disegna le onde attuali
-  for (let i = sources.length - 1; i >= 0; i--) {
-    const src = sources[i];
-    src.drawWaveLayer(tempCanvas);
+  if (config.saveBackground) {
+    tempCanvas.background(pal.bg);
   }
-
+  tempCanvas.image(waveLayer, 0, 0);
   tempCanvas.save("onda_singola.png");
   tempCanvas.remove();
 }
@@ -1120,13 +1115,23 @@ function toggleRecording() {
     toggleUIAccess(false);
     updateExportStatus("Registrazione in corso...");
   } else {
+    updateExportStatus("Elaborazione video... Attendere.");
     capturer.stop();
-    capturer.save();
-    btn.textContent = "Registra Video (.webm)";
-    btn.classList.remove("recording");
-    toggleUIAccess(true);
-    updateExportStatus("Salvataggio video...");
-    clearSources();
+    capturer.save((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "animazione-onde.webm";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      updateExportStatus("Video salvato!");
+      btn.textContent = "Registra Video (.webm)";
+      btn.classList.remove("recording");
+      toggleUIAccess(true);
+      clearSources();
+    });
   }
 }
 
