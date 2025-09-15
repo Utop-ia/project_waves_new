@@ -2,6 +2,18 @@
 // Parametri Principali
 // ---------------------
 const config = {
+  bgOpacity: 1.0,
+  bgFillBlur: false,
+  bgBlurPx: 12,
+  bgBlurOpacity: 0.6,
+  bgAnchor: "center",
+  bgOffsetX: 0,
+  bgOffsetY: 0,
+  bgFit: "contain", // contain | cover | stretch | center | tile
+  bgLockCanvas: false,
+  bgTileScale: 1.0,
+  bgMode: "color", // "color" | "image"
+  
   speedPrimary: 30,
   intervalPrimary: 0.3,
   strokePrimary: 80,
@@ -41,7 +53,6 @@ const TARGET_FPS = 60;
 const FRAME_DT = 1 / TARGET_FPS;
 const MAX_TAIL_SECONDS = 6; // limite massimo per la coda
 const EXTRA_HOLD_SECONDS = 0.5; // piccolo fermo immagine finale
-const EPS = 1e-6; // tolleranza per confronti temporali
 
 let t = 0;
 let paused = false;
@@ -49,6 +60,7 @@ let sources = [];
 const stats = { fps: 0, sourcesCount: 0, wavesDrawn: 0 };
 let maxR;
 let waveLayer;
+let bgImage = null; let bgImageMeta = null; let bgBlurBuffer = null; let bgBlurDirty = true;
 const vectorPool = [];
 let p5Canvas; // riferimento al canvas principale
 
@@ -486,7 +498,8 @@ function updateSimulation(dt) {
 // ===================================================================
 function renderCanvas() {
   if (config.saveBackground) {
-    waveLayer.background(pal.bg);
+    if (config.bgMode === "image" && bgImage) { waveLayer.clear(); drawBackgroundImage(waveLayer, bgImage); }
+    else { waveLayer.background(pal.bg); }
   } else {
     waveLayer.clear();
   }
@@ -499,7 +512,8 @@ function renderCanvas() {
     stats.wavesDrawn += src.drawWaveLayer(waveLayer);
   }
 
-  background(pal.bg);
+  if (config.bgMode === "image" && bgImage) { drawBackgroundImage(window, bgImage); }
+  else { background(pal.bg); }
   image(waveLayer, 0, 0);
 
   if (paused) {
@@ -671,6 +685,291 @@ function anySourceAlive() {
 // ===================================================================
 // UI
 // ===================================================================
+
+// ================= Background Image Helpers =================
+// ============== Background fit helpers ==============
+function computeDrawRect(imgW, imgH, canvasW, canvasH, mode, anchor="center", offX=0, offY=0) {
+  if (mode === 'stretch') return { x:Math.round(offX), y:Math.round(offY), w:canvasW, h:canvasH };
+  // anchor fractions
+  const map = {
+    'top-left':[0,0],'top':[0.5,0],'top-right':[1,0],
+    'left':[0,0.5],'center':[0.5,0.5],'right':[1,0.5],
+    'bottom-left':[0,1],'bottom':[0.5,1],'bottom-right':[1,1]
+  };
+  const a = map[anchor] || [0.5,0.5];
+  const imgAR = imgW / imgH;
+  const canAR = canvasW / canvasH;
+  let w, h;
+  if (mode === 'cover') {
+    if (imgAR > canAR) { h = canvasH; w = Math.ceil(h * imgAR); }
+    else { w = canvasW; h = Math.ceil(w / imgAR); }
+  } else if (mode === 'contain' || mode === 'center') {
+    if (mode === 'center') { w = imgW; h = imgH; }
+    else {
+      if (imgAR > canAR) { w = canvasW; h = Math.ceil(w / imgAR); }
+      else { h = canvasH; w = Math.ceil(h * imgAR); }
+    }
+  } else { // default to contain
+    if (imgAR > canAR) { w = canvasW; h = Math.ceil(w / imgAR); }
+    else { h = canvasH; w = Math.ceil(h * imgAR); }
+  }
+  const x = Math.round((canvasW - w) * a[0] + offX - (a[0] * (canvasW - w)));
+  const y = Math.round((canvasH - h) * a[1] + offY - (a[1] * (canvasH - h)));
+  return { x, y, w, h };
+}
+
+function drawBackgroundImage(p5ctx, img) {
+  const mode = config.bgFit || 'contain';
+  const anchor = config.bgAnchor || 'center';
+  const offX = parseInt(config.bgOffsetX || 0, 10);
+  const offY = parseInt(config.bgOffsetY || 0, 10);
+  const opacity = Math.max(0, Math.min(1, config.bgOpacity || 1));
+
+  // Optional blurred fill layer
+  if (config.bgFillBlur && img) {
+    if (!bgBlurBuffer || bgBlurBuffer.width !== width || bgBlurBuffer.height !== height) {
+      bgBlurBuffer = createGraphics(width, height);
+      bgBlurDirty = true;
+    }
+    if (bgBlurDirty) {
+      bgBlurBuffer.clear();
+      // Always cover for blur fill
+      const rCover = computeDrawRect(img.width, img.height, width, height, 'cover', 'center', 0, 0);
+      bgBlurBuffer.image(img, rCover.x, rCover.y, rCover.w, rCover.h);
+      try { bgBlurBuffer.filter(BLUR, Math.max(0, config.bgBlurPx || 0)); } catch(e){}
+      bgBlurDirty = false;
+    }
+    const blurOpacity = Math.max(0, Math.min(1, config.bgBlurOpacity ?? 0.6));
+    p5ctx.push();
+    p5ctx.tint(255, Math.round(blurOpacity * 255));
+    p5ctx.image(bgBlurBuffer, 0, 0);
+    p5ctx.pop();
+  }
+
+  if (mode === 'tile') {
+    const scale = Math.max(0.1, config.bgTileScale || 1.0);
+    const w = Math.max(1, Math.floor(img.width * scale));
+    const h = Math.max(1, Math.floor(img.height * scale));
+    p5ctx.push();
+    p5ctx.tint(255, Math.round(opacity * 255));
+    for (let y = -((offY%h+h)%h); y < height; y += h) {
+      for (let x = -((offX%w+w)%w); x < width; x += w) {
+        p5ctx.image(img, x, y, w, h);
+      }
+    }
+    p5ctx.pop();
+    return;
+  }
+
+  const r = computeDrawRect(img.width, img.height, width, height, mode, anchor, offX, offY);
+  p5ctx.push();
+  p5ctx.tint(255, Math.round(opacity * 255));
+  p5ctx.image(img, r.x, r.y, r.w, r.h);
+  p5ctx.pop();
+}
+
+// ============== URL loader ==============
+async function loadBackgroundFromUrl(url) {
+  return new Promise((resolve, reject) => {
+    loadImage(url, (img) => resolve(img), (err) => reject(err));
+  });
+}
+
+// ============== Presets (LocalStorage) ==============
+const BG_PRESETS_KEY = "bg_presets_v1";
+
+function loadBgPresets() {
+  try {
+    const raw = localStorage.getItem(BG_PRESETS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch(e) {
+    console.warn("Preset sfondo: parse error", e);
+    return [];
+  }
+}
+
+function saveBgPresets(list) {
+  try {
+    localStorage.setItem(BG_PRESETS_KEY, JSON.stringify(list));
+  } catch(e) {
+    console.warn("Preset sfondo: save error", e);
+  }
+}
+
+function renderBgPresetsList() {
+  const el = document.getElementById('bg-presets-list');
+  if (!el) return;
+  const list = loadBgPresets();
+  el.innerHTML = '';
+  list.forEach((p, idx) => {
+    const item = document.createElement('div');
+    item.className = 'bg-preset-item';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = p.name || `Preset ${idx+1}`;
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = 'Applica';
+    const renameBtn = document.createElement('button');
+    renameBtn.textContent = 'Rinomina';
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Elimina';
+
+    applyBtn.addEventListener('click', async () => {
+      try {
+        config.bgFit = p.bgFit || 'contain';
+        config.bgOpacity = (typeof p.bgOpacity === 'number') ? p.bgOpacity : (config.bgOpacity || 1.0);
+        config.bgBlurOpacity = (typeof p.bgBlurOpacity === 'number') ? p.bgBlurOpacity : (config.bgBlurOpacity ?? 0.6);
+        config.bgFillBlur = !!p.bgFillBlur;
+        config.bgBlurPx = (typeof p.bgBlurPx === 'number') ? p.bgBlurPx : (config.bgBlurPx || 0);
+        config.bgAnchor = p.bgAnchor || 'center';
+        config.bgOffsetX = p.bgOffsetX || 0;
+        config.bgOffsetY = p.bgOffsetY || 0;
+        config.bgLockCanvas = !!p.bgLockCanvas;
+        config.bgTileScale = p.bgTileScale || 1.0;
+        document.getElementById('bg-fit').value = config.bgFit;
+        document.getElementById('bg-lock-canvas').checked = config.bgLockCanvas;
+        const op = document.getElementById('bg-opacity'); const opn = document.getElementById('bg-opacity-num'); if (op && opn) { op.value = Math.round((config.bgOpacity||1)*100); opn.value = Math.round((config.bgOpacity||1)*100);} 
+        const bop = document.getElementById('bg-blur-opacity'); const bopn = document.getElementById('bg-blur-opacity-num'); if (bop && bopn) { bop.value = Math.round((config.bgBlurOpacity??0.6)*100); bopn.value = Math.round((config.bgBlurOpacity??0.6)*100);} 
+        document.getElementById('bg-fill-blur').checked = !!config.bgFillBlur; const br = document.getElementById('bg-blur-row'); if (br) br.style.display = config.bgFillBlur ? 'grid' : 'none'; 
+        const bp = document.getElementById('bg-blur'); if (bp) bp.value = String(config.bgBlurPx||0);
+        const ba = document.getElementById('bg-anchor'); if (ba) ba.value = config.bgAnchor || 'center';
+        const bxx = document.getElementById('bg-offset-x'); if (bxx) bxx.value = String(config.bgOffsetX||0);
+        const bxy = document.getElementById('bg-offset-y'); if (bxy) bxy.value = String(config.bgOffsetY||0);
+        document.getElementById('bg-tile-scale').value = Math.round(config.bgTileScale * 100);
+        document.getElementById('bg-tile-scale-row').style.display = (config.bgFit==='tile') ? 'grid' : 'none';
+        if (p.embed && p.dataUrl) {
+          loadImage(p.dataUrl, (img) => {
+            applyBackgroundImage(img, { name: p.name, source: 'embed' }, false);
+            setBackgroundMode('image');
+          });
+        } else if (p.url) {
+          const img = await loadBackgroundFromUrl(p.url);
+          applyBackgroundImage(img, { name: p.name, source: 'url', url: p.url }, false);
+          setBackgroundMode('image');
+          const urlInput = document.getElementById('bg-url'); if (urlInput) urlInput.value = p.url;
+        } else {
+          // Nessuna immagine salvata: solo impostazioni
+          setBackgroundMode('color');
+        }
+      } catch(e) {
+        alert('Impossibile applicare il preset: ' + (e?.message || e));
+      }
+    });
+
+    renameBtn.addEventListener('click', () => {
+      const nv = prompt('Nuovo nome preset:', p.name || '');
+      if (!nv) return;
+      p.name = nv;
+      saveBgPresets(list);
+      renderBgPresetsList();
+    });
+
+    delBtn.addEventListener('click', () => {
+      list.splice(idx, 1);
+      saveBgPresets(list);
+      renderBgPresetsList();
+    });
+
+    actions.appendChild(applyBtn);
+    actions.appendChild(renameBtn);
+    actions.appendChild(delBtn);
+    item.appendChild(name);
+    item.appendChild(actions);
+    el.appendChild(item);
+  });
+}
+
+async function setBackgroundMode(mode) {
+  config.bgMode = mode === 'image' ? 'image' : 'color';
+  const fileGroup = document.getElementById('bg-file-group');
+  if (fileGroup) fileGroup.style.display = config.bgMode === 'image' ? 'block' : 'none';
+}
+
+function updateBgInfo(text) {
+  const el = document.getElementById('bg-info');
+  if (el) el.textContent = text || '';
+}
+
+function applyBackgroundImage(img, meta, autoSize) {
+  bgImage = img; bgBlurDirty = true;
+  bgImageMeta = meta || null;
+  updateBgInfo(meta ? `${meta.name || 'immagine'} — ${img.width}×${img.height}px` : `${img.width}×${img.height}px`);
+  if (autoSize && !config.bgLockCanvas) { bgBlurDirty = true;
+    // Aggiorna anche il pannello Formato se presente
+    const wEl = document.getElementById('custom-width');
+    const hEl = document.getElementById('custom-height');
+    const wEl2 = document.getElementById('custom-w') || wEl; // compat
+    const hEl2 = document.getElementById('custom-h') || hEl; // compat
+    try { if (wEl2) wEl2.value = img.width; if (hEl2) hEl2.value = img.height; } catch(e){}
+    resizeCanvas(width, height); // ensure p5 internal consistency first
+    resizeCanvas(img.width, img.height);
+    waveLayer.resizeCanvas(img.width, img.height);
+    maxR = Math.hypot(width, height);
+    sources.forEach((src) => src.calculateImageSources());
+    applyCanvasZoom && applyCanvasZoom();
+  }
+}
+
+function clearBackgroundImage() {
+  bgImage = null;
+  bgImageMeta = null;
+  updateBgInfo('');
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error('Impossibile leggere il file'));
+    fr.onload = () => {
+      loadImage(fr.result, (img) => resolve(img), (err) => reject(err));
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+async function loadPdfFirstPageAsImage(file, targetWidth) {
+  if (!window.pdfjsLib) throw new Error('pdf.js non caricato');
+  const arrayBuf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1.0 });
+  const scale = Math.max(1, (targetWidth || width) / viewport.width);
+  const vp = page.getViewport({ scale });
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = Math.floor(vp.width);
+  tmpCanvas.height = Math.floor(vp.height);
+  const ctx = tmpCanvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  return new Promise((resolve) => {
+    loadImage(tmpCanvas.toDataURL('image/png'), (img) => resolve(img));
+  });
+}
+
+async function handleBackgroundFile(file) {
+  const auto = !!document.getElementById('bg-autosize')?.checked;
+  const name = file.name || '';
+  const type = file.type || '';
+  try {
+    if (type === 'application/pdf' || name.toLowerCase().endsWith('.pdf')) {
+      const img = await loadPdfFirstPageAsImage(file, width);
+      applyBackgroundImage(img, { name }, auto);
+      setBackgroundMode('image');
+      return;
+    }
+    // immagini raster / svg
+    const img = await loadImageFromFile(file);
+    applyBackgroundImage(img, { name }, auto);
+    setBackgroundMode('image');
+  } catch (e) {
+    console.error(e);
+    alert('Errore nel caricamento dello sfondo: ' + (e?.message || e));
+  }
+}
+
 function initializeUI() {
   document.querySelectorAll(".panel-header").forEach((header) => {
     header.addEventListener("click", () => {
@@ -865,12 +1164,10 @@ function initializeUI() {
     .getElementById("record-video-btn")
     .addEventListener("click", toggleRecording);
   document
-    .getElementById("save-sequence-btn").addEventListener("click", () => startExport("png"));
+    .getElementById("save-sequence-btn")
+    .addEventListener("click", () => startExport("png"));
 
-  // Nuovi pulsanti Offline CFR
-  document.getElementById("offline-webm-btn").addEventListener("click", () => startExportOffline("webm"));
-  document.getElementById("offline-png-btn").addEventListener("click", () => startExportOffline("png"));
-document.getElementById("pause-btn").addEventListener("click", togglePause);
+  document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", () => {
     isPlayingAnimation = false;
     currentSequence = null;
@@ -912,6 +1209,7 @@ document.getElementById("pause-btn").addEventListener("click", togglePause);
 }
 
 function updateUIFromState() {
+  try{ const bgMode = config.bgMode || "color"; document.getElementById("bg-mode-color").checked = bgMode==="color"; document.getElementById("bg-mode-image").checked = bgMode==="image"; const fileGroup=document.getElementById("bg-file-group"); if(fileGroup) fileGroup.style.display = bgMode==="image" ? "block" : "none"; }catch(e){}
   document.querySelectorAll(".slider-group").forEach((group) => {
     const slider = group.querySelector('input[type="range"]');
     const numberInput = group.querySelector('input[type="number"]');
@@ -1203,9 +1501,9 @@ function startExport(format = "webm", animOpt = null) {
   sequence.events.sort((a, b) => a.time - b.time);
 
   let nextEventIndex = 0;
-  const totalFrames = Math.ceil(sequence.duration * TARGET_FPS);
-  const maxTailFrames = Math.ceil(MAX_TAIL_SECONDS * TARGET_FPS);
-  const holdFrames = Math.ceil(EXTRA_HOLD_SECONDS * TARGET_FPS);
+  const totalFrames = Math.round(sequence.duration * TARGET_FPS);
+  const maxTailFrames = Math.round(MAX_TAIL_SECONDS * TARGET_FPS);
+  const holdFrames = Math.round(EXTRA_HOLD_SECONDS * TARGET_FPS);
 
   let frameIndex = 0;
   let tailFrameIndex = 0;
@@ -1225,7 +1523,7 @@ function startExport(format = "webm", animOpt = null) {
       // Emetti eventi fino a tNow
       while (
         nextEventIndex < sequence.events.length &&
-        sequence.events[nextEventIndex].time <= tNow + EPS
+        sequence.events[nextEventIndex].time <= tNow
       ) {
         const ev = sequence.events[nextEventIndex++];
         sources.unshift(
@@ -1244,7 +1542,7 @@ function startExport(format = "webm", animOpt = null) {
       updateExportStatus(`Rendering... ${progress}%`);
 
       if (frameIndex < totalFrames) {
-        requestAnimationFrame(step);
+        setTimeout(step, 0);
         return;
       }
       // Passa alla coda (nessun nuovo evento)
@@ -1264,7 +1562,7 @@ function startExport(format = "webm", animOpt = null) {
       updateExportStatus(
         `Coda... ${Math.round((tailFrameIndex / maxTailFrames) * 100)}%`
       );
-      requestAnimationFrame(step);
+      setTimeout(step, 0);
       return;
     }
 
@@ -1273,7 +1571,7 @@ function startExport(format = "webm", animOpt = null) {
       capturer.capture(p5Canvas.elt);
       holdFrameIndex++;
       if (holdFrameIndex < holdFrames) {
-        requestAnimationFrame(step);
+        setTimeout(step, 0);
         return;
       }
       phase = "done";
@@ -1301,129 +1599,6 @@ function finishRecording() {
   updateExportStatus("Video salvato!");
 }
 
-
-// ===================================================================
-// Export Offline CFR (deterministico, non legato al vsync)
-// ===================================================================
-async function startExportOffline(format = "png", animOpt = null) {
-  if (isExporting) return;
-
-  const anim = animOpt || getSelectedAnimation();
-  if (!anim) {
-    alert("Per favore, seleziona un'animazione da esportare.");
-    return;
-  }
-
-  capturer = new CCapture({
-    format, // "webm" o "png"
-    framerate: TARGET_FPS,
-    verbose: false,
-    name: format === "png" ? "sequenza-onde" : "animazione-onde",
-    quality: 98,
-  });
-
-  // Reset simulazione e pre-elaborazione eventi
-  clearSources();
-  const sequence = JSON.parse(JSON.stringify(anim));
-  sequence.events.sort((a, b) => a.time - b.time);
-
-  let nextEventIndex = 0;
-  const totalFrames = Math.ceil(sequence.duration * TARGET_FPS);
-  const maxTailFrames = Math.ceil(MAX_TAIL_SECONDS * TARGET_FPS);
-  const holdFrames = Math.ceil(EXTRA_HOLD_SECONDS * TARGET_FPS);
-
-  let frameIndex = 0;
-  let tailFrameIndex = 0;
-  let holdFrameIndex = 0;
-  let phase = "events"; // events -> tail -> hold -> done
-
-  isExporting = true;
-  toggleUIAccess(false);
-  updateExportStatus("Preparazione export offline…");
-  capturer.start();
-
-  const CHUNK = 120; // numero di frame per batch, evita blocchi UI e non perde frame
-
-  // Helper per cedere il controllo al browser
-  const yieldToBrowser = () => new Promise((r) => setTimeout(r, 0));
-
-  while (isExporting && phase !== "done") {
-    if (phase === "events") {
-      let processed = 0;
-      while (isExporting && frameIndex < totalFrames && processed < CHUNK) {
-        const tNow = frameIndex * FRAME_DT;
-        while (
-          nextEventIndex < sequence.events.length &&
-          sequence.events[nextEventIndex].time <= tNow + EPS
-        ) {
-          const ev = sequence.events[nextEventIndex++];
-          sources.unshift(
-            new WaveSource(ev.x * width, ev.y * height, ev.override)
-          );
-        }
-        updateSimulation(FRAME_DT);
-        renderCanvas();
-        capturer.capture(p5Canvas.elt);
-        frameIndex++;
-        processed++;
-      }
-      const progress = Math.min(
-        100,
-        Math.round((frameIndex / totalFrames) * 100)
-      );
-      updateExportStatus(`Rendering (offline)… ${progress}%`);
-      if (frameIndex < totalFrames) {
-        await yieldToBrowser();
-        continue;
-      }
-      phase = "tail";
-      continue;
-    }
-
-    if (phase === "tail") {
-      let processed = 0;
-      while (
-        isExporting &&
-        tailFrameIndex < maxTailFrames &&
-        anySourceAlive() &&
-        processed < CHUNK
-      ) {
-        updateSimulation(FRAME_DT);
-        renderCanvas();
-        capturer.capture(p5Canvas.elt);
-        tailFrameIndex++;
-        processed++;
-      }
-      if (tailFrameIndex < maxTailFrames && anySourceAlive()) {
-        await yieldToBrowser();
-        continue;
-      }
-      phase = "hold";
-      continue;
-    }
-
-    if (phase === "hold") {
-      while (isExporting && holdFrameIndex < holdFrames) {
-        renderCanvas();
-        capturer.capture(p5Canvas.elt);
-        holdFrameIndex++;
-      }
-      phase = "done";
-      continue;
-    }
-  }
-
-  if (!isExporting) return;
-
-  updateExportStatus("Finalizzazione…");
-  capturer.stop();
-  capturer.save();
-  toggleUIAccess(true);
-  isExporting = false;
-  clearSources();
-  renderCanvas();
-  updateExportStatus("Export offline completato!");
-}
 // ===================================================================
 // Finali
 // ===================================================================
@@ -1432,7 +1607,7 @@ function windowResized() {
   const canvasContainer = document.getElementById("canvas-container");
   if (document.getElementById("format-select").value === "viewport") {
     resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
-    waveLayer.resizeCanvas(width, height);
+    waveLayer.resizeCanvas(width, height); bgBlurBuffer = null; bgBlurDirty = true;
     maxR = Math.hypot(width, height);
     sources.forEach((src) => src.calculateImageSources());
   }
@@ -1449,7 +1624,3 @@ function updateStats() {
     statsDisplay.children[2].textContent = `Onde: ${stats.wavesDrawn}`;
   }
 }
-
-// Fallback: add listeners at end
- document.getElementById("offline-webm-btn").addEventListener("click", () => startExportOffline("webm"));
- document.getElementById("offline-png-btn").addEventListener("click", () => startExportOffline("png"));
