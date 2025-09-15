@@ -89,7 +89,7 @@ const brandPresets = {
       intervalSecondary: 0.4,
       strokeSecondary: 25,
       alphaSecondary: 0.8,
-      decayFactorPrimary: 2.0,
+      decayFactorSecondary: 2.0,
       heartSizeSecondary: 1,
       maxWavesSecondary: 3,
       maxReflections: 2,
@@ -485,7 +485,7 @@ function draw() {
   updateStats();
 
   if (isRecording) {
-    capturer.capture(document.querySelector(".p5Canvas"));
+    capturer.capture(canvas);
   }
   if (isSavingSequence) {
     save(`sequenza/frame_${nf(frameCount, 4)}.png`);
@@ -919,7 +919,7 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  if (isPlayingAnimation) return;
+  if (isPlayingAnimation || isRecordingAnimation) return;
   if (event.target.classList.contains("p5Canvas")) {
     if (isRecordingAnimation) {
       const t = (millis() - recordingStartTime) / 1000;
@@ -937,6 +937,7 @@ function mousePressed(event) {
 function keyPressed() {
   if (document.activeElement.tagName === "INPUT") return;
   if (key === " ") togglePause();
+  if (key === "s" || key === "S") saveSinglePNG();
   if (key === "c" || key === "C") clearSources();
   if (key === "r" || key === "R") resetSimulation();
 }
