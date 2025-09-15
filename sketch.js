@@ -55,6 +55,11 @@ let recordedEvents = [];
 let savedAnimationCount = 0;
 const userAnimationPresets = {};
 
+let capturer;
+let isRecording = false;
+let isSavingSequence = false;
+let sequenceFrameCount = 0;
+
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
     const v = vectorPool.pop();
@@ -372,6 +377,14 @@ function setup() {
 
   initializeUI();
   updateUIFromState();
+
+  capturer = new CCapture({
+    format: "webm",
+    framerate: 60,
+    verbose: false,
+    name: "animazione-onde",
+    quality: 98,
+  });
 }
 
 // ===================================================================
@@ -433,16 +446,16 @@ function draw() {
     if (animationTime >= currentSequence.duration) {
       isPlayingAnimation = false;
       document.getElementById("play-animation-btn").textContent = "Avvia";
+      if (isRecording) toggleRecording();
+      if (isSavingSequence) saveFrameSequence();
     }
   }
 
-  if (config.saveBackground) waveLayer.background(pal.bg);
-  else waveLayer.clear();
-
-  waveLayer.push();
-  waveLayer.clip(() => {
-    waveLayer.rect(0, 0, width, height);
-  });
+  if (config.saveBackground) {
+    waveLayer.background(pal.bg);
+  } else {
+    waveLayer.clear();
+  }
 
   stats.wavesDrawn = 0;
   for (let i = sources.length - 1; i >= 0; i--) {
@@ -455,8 +468,6 @@ function draw() {
     }
   }
 
-  waveLayer.pop();
-
   background(pal.bg);
   image(waveLayer, 0, 0);
 
@@ -467,11 +478,18 @@ function draw() {
     fill(255, 255, 255, 200);
     textSize(min(width, height) * 0.1);
     textAlign(CENTER, CENTER);
-    textStyle(NORMAL);
+    textStyle(BOLD);
     text("PAUSA", width / 2, height / 2);
   }
 
   updateStats();
+
+  if (isRecording) {
+    capturer.capture(document.querySelector(".p5Canvas"));
+  }
+  if (isSavingSequence) {
+    save(`sequenza/frame_${nf(frameCount, 4)}.png`);
+  }
 }
 
 // ===================================================================
@@ -723,7 +741,7 @@ function initializeUI() {
   const deleteAnimBtn = document.getElementById("delete-animation-btn");
 
   function populateAnimationPresets() {
-    animPresetSelect.innerHTML = "";
+    animPresetSelect.innerHTML = '<option value="">-- Predefinite --</option>';
     for (const name in animationPresets) {
       const option = document.createElement("option");
       option.value = name;
@@ -735,7 +753,7 @@ function initializeUI() {
 
   function populateUserAnimationPresets() {
     const currentVal = userAnimSelect.value;
-    userAnimSelect.innerHTML = '<option value="">-- Seleziona --</option>';
+    userAnimSelect.innerHTML = '<option value="">-- Salvate --</option>';
     for (const name in userAnimationPresets) {
       const option = document.createElement("option");
       option.value = name;
@@ -760,11 +778,7 @@ function initializeUI() {
     updateManageButtons();
   });
   userAnimSelect.addEventListener("change", () => {
-    if (userAnimSelect.value !== "") {
-      // Find the first option in the default select and set it to that
-      const firstDefaultOption = animPresetSelect.querySelector("option");
-      if (firstDefaultOption) animPresetSelect.value = firstDefaultOption.value;
-    }
+    if (userAnimSelect.value !== "") animPresetSelect.value = "";
     updateManageButtons();
   });
   updateManageButtons();
@@ -775,7 +789,9 @@ function initializeUI() {
     if (selectedUser) {
       playAnimation(selectedUser, true);
     } else if (selectedDefault) {
-      playAnimation(selectedDefault);
+      playAnimation(selectedDefault, false);
+    } else {
+      alert("Per favore, seleziona un'animazione da avviare.");
     }
   });
 
@@ -816,8 +832,15 @@ function initializeUI() {
   });
 
   document
-    .getElementById("save-waves-btn")
-    .addEventListener("click", saveWaves);
+    .getElementById("save-png-btn")
+    .addEventListener("click", saveSinglePNG);
+  document
+    .getElementById("record-video-btn")
+    .addEventListener("click", toggleRecording);
+  document
+    .getElementById("save-sequence-btn")
+    .addEventListener("click", saveFrameSequence);
+
   document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", clearSources);
   document
@@ -896,7 +919,7 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  if (isPlayingAnimation) return;
+  if (isPlayingAnimation || isRecordingAnimation) return;
   if (event.target.classList.contains("p5Canvas")) {
     if (isRecordingAnimation) {
       const t = (millis() - recordingStartTime) / 1000;
@@ -914,7 +937,7 @@ function mousePressed(event) {
 function keyPressed() {
   if (document.activeElement.tagName === "INPUT") return;
   if (key === " ") togglePause();
-  if (key === "s" || key === "S") saveWaves();
+  if (key === "s" || key === "S") saveSinglePNG();
   if (key === "c" || key === "C") clearSources();
   if (key === "r" || key === "R") resetSimulation();
 }
@@ -1008,7 +1031,6 @@ function toggleAnimationRecording() {
       userAnimSelect.appendChild(option);
       userAnimSelect.value = newAnimationName;
 
-      // Deseleziona il menu dei preset di default
       document.getElementById("animation-preset-select").value = "";
 
       document.getElementById("rename-animation-btn").disabled = false;
@@ -1033,20 +1055,106 @@ function resizeCanvasAndContent(w, h) {
 }
 
 // ===================================================================
-// Funzione salvataggio PNG
+// Funzioni di Esportazione
 // ===================================================================
-function saveWaves() {
+function saveSinglePNG() {
   const tempCanvas = createGraphics(width, height);
   if (config.saveBackground) tempCanvas.background(pal.bg);
-  else tempCanvas.clear();
 
+  // Disegna le onde attuali
   for (let i = sources.length - 1; i >= 0; i--) {
     const src = sources[i];
     src.drawWaveLayer(tempCanvas);
   }
 
-  tempCanvas.save("onde.png");
+  tempCanvas.save("onda_singola.png");
   tempCanvas.remove();
+}
+
+function updateExportStatus(message) {
+  document.getElementById("export-status").textContent = message;
+}
+
+function toggleUIAccess(enabled) {
+  document
+    .querySelectorAll(
+      "#ui-sidebar button, #ui-sidebar input, #ui-sidebar select"
+    )
+    .forEach((el) => {
+      const idsToKeepActive = ["record-video-btn", "save-sequence-btn"];
+      if (!idsToKeepActive.includes(el.id)) {
+        el.disabled = !enabled;
+      }
+    });
+}
+
+function getSelectedAnimation() {
+  const selectedDefault = document.getElementById(
+    "animation-preset-select"
+  ).value;
+  const selectedUser = document.getElementById("user-animation-select").value;
+  if (selectedUser) {
+    return { name: selectedUser, isUser: true };
+  } else if (selectedDefault) {
+    return { name: selectedDefault, isUser: false };
+  }
+  return null;
+}
+
+function toggleRecording() {
+  if (isSavingSequence) return;
+  isRecording = !isRecording;
+  const btn = document.getElementById("record-video-btn");
+
+  if (isRecording) {
+    const anim = getSelectedAnimation();
+    if (!anim) {
+      alert("Per favore, seleziona un'animazione da registrare.");
+      isRecording = false;
+      return;
+    }
+    playAnimation(anim.name, anim.isUser);
+    capturer.start();
+    btn.textContent = "Ferma e Salva";
+    btn.classList.add("recording");
+    toggleUIAccess(false);
+    updateExportStatus("Registrazione in corso...");
+  } else {
+    capturer.stop();
+    capturer.save();
+    btn.textContent = "Registra Video (.webm)";
+    btn.classList.remove("recording");
+    toggleUIAccess(true);
+    updateExportStatus("Salvataggio video...");
+    clearSources();
+  }
+}
+
+function saveFrameSequence() {
+  if (isRecording) return;
+  isSavingSequence = !isSavingSequence;
+  const btn = document.getElementById("save-sequence-btn");
+
+  if (isSavingSequence) {
+    const anim = getSelectedAnimation();
+    if (!anim) {
+      alert("Per favore, seleziona un'animazione da salvare.");
+      isSavingSequence = false;
+      return;
+    }
+    sequenceFrameCount = 0;
+    playAnimation(anim.name, anim.isUser);
+    btn.textContent = "Interrompi";
+    btn.classList.add("recording");
+    toggleUIAccess(false);
+    updateExportStatus("Salvataggio sequenza in corso...");
+  } else {
+    btn.textContent = "Salva Sequenza (PNG)";
+    btn.classList.remove("recording");
+    toggleUIAccess(true);
+    updateExportStatus("Salvataggio sequenza completato.");
+    clearSources();
+  }
 }
 
 // ===================================================================

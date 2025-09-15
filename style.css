@@ -280,10 +280,14 @@ button:disabled {
   opacity: 0.6;
 }
 
-#record-animation-btn.recording {
+#record-animation-btn.recording,
+#record-video-btn.recording,
+#save-sequence-btn.recording {
   background-color: var(--danger-color);
 }
-#record-animation-btn.recording:hover {
+#record-animation-btn.recording:hover,
+#record-video-btn.recording:hover,
+#save-sequence-btn.recording:hover {
   background-color: #c0392b;
 }
 

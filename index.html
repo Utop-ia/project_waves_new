@@ -6,6 +6,8 @@
     <title>Simulatore di Risonanza</title>
     <link rel="stylesheet" href="style.css" />
     <script src="p5.min.js" defer></script>
+    <script src="webm-writer.js" defer></script>
+    <script src="CCapture.all.min.js" defer></script>
     <script src="sketch.js" defer></script>
   </head>
   <body>
@@ -526,7 +528,32 @@
                 Includi sfondo
               </label>
             </div>
-            <button id="save-waves-btn">Esporta PNG</button>
+            <div class="preset-group">
+              <button id="save-png-btn">Esporta PNG</button>
+            </div>
+            <div
+              class="preset-group"
+              style="
+                border-top: 1px solid var(--border-color);
+                padding-top: 20px;
+              "
+            >
+              <label>Esporta Animazione</label>
+              <button id="record-video-btn">Registra Video (.webm)</button>
+              <button id="save-sequence-btn" style="margin-top: 10px">
+                Salva Sequenza (PNG)
+              </button>
+              <p
+                id="export-status"
+                style="
+                  font-size: 12px;
+                  color: var(--text-secondary);
+                  margin-top: 10px;
+                  text-align: center;
+                  height: 15px;
+                "
+              ></p>
+            </div>
           </div>
         </div>
 
