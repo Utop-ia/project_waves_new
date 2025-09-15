@@ -56,9 +56,7 @@ let savedAnimationCount = 0;
 const userAnimationPresets = {};
 
 let capturer;
-let isRecording = false;
-let isSavingSequence = false;
-let frameCountForSequence = 0;
+let isExporting = false; // Stato unificato per qualsiasi tipo di esportazione
 
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
@@ -425,18 +423,24 @@ function applyCanvasZoom() {
 }
 
 // ===================================================================
-// Ciclo draw
+// Funzione di disegno principale (per interattività)
 // ===================================================================
 function draw() {
-  // *** CORREZIONE: Limita il deltaTime per prevenire salti temporali ***
-  let dt = paused ? 0 : deltaTime / 1000;
-  dt = min(dt, 0.1); // Non permettere al dt di essere > 100ms (equivale a 10 FPS)
+  if (isExporting) return; // Se stiamo esportando, il rendering è gestito altrove
+
+  const dt = paused ? 0 : deltaTime / 1000;
+  updateSimulation(dt);
+  renderCanvas();
+}
+
+// ===================================================================
+// Funzione che aggiorna lo stato della simulazione
+// ===================================================================
+function updateSimulation(dt) {
   t += dt;
 
-  // --- LOGICA ANIMAZIONE ---
   if (isPlayingAnimation && !paused) {
     animationTime += dt;
-    // Esegui eventi
     while (
       currentSequence &&
       nextEventIndex < currentSequence.events.length &&
@@ -448,29 +452,27 @@ function draw() {
       );
       nextEventIndex++;
     }
-    // Fine animazione
     if (currentSequence && animationTime >= currentSequence.duration) {
       isPlayingAnimation = false;
       currentSequence = null;
       document.getElementById("play-animation-btn").textContent = "Avvia";
-
-      if (isRecording) {
-        toggleRecording(); // Ferma la registrazione video
-      }
-      if (isSavingSequence) {
-        // La sequenza di frame si ferma da sola
-        isSavingSequence = false;
-        const btn = document.getElementById("save-sequence-btn");
-        btn.textContent = "Salva Sequenza (PNG)";
-        btn.classList.remove("recording");
-        toggleUIAccess(true);
-        updateExportStatus("Salvataggio sequenza completato.");
-        clearSources();
-      }
     }
   }
 
-  // --- DISEGNO ---
+  for (let i = sources.length - 1; i >= 0; i--) {
+    const src = sources[i];
+    src.update(dt);
+    if (!src.isAlive()) {
+      src.destroy();
+      sources.splice(i, 1);
+    }
+  }
+}
+
+// ===================================================================
+// Funzione che disegna il canvas
+// ===================================================================
+function renderCanvas() {
   if (config.saveBackground) {
     waveLayer.background(pal.bg);
   } else {
@@ -478,14 +480,8 @@ function draw() {
   }
 
   stats.wavesDrawn = 0;
-  for (let i = sources.length - 1; i >= 0; i--) {
-    const src = sources[i];
-    src.update(dt);
+  for (const src of sources) {
     stats.wavesDrawn += src.drawWaveLayer(waveLayer);
-    if (!src.isAlive()) {
-      src.destroy();
-      sources.splice(i, 1);
-    }
   }
 
   background(pal.bg);
@@ -503,18 +499,10 @@ function draw() {
   }
 
   updateStats();
-
-  // --- ESPORTAZIONE ---
-  if (isRecording) {
-    capturer.capture(canvas);
-  }
-  if (isSavingSequence) {
-    save(`sequenza/frame_${nf(frameCountForSequence++, 4)}.png`);
-  }
 }
 
 // ===================================================================
-// WaveSource
+// WaveSource Class (invariata)
 // ===================================================================
 class WaveSource {
   constructor(x, y, override = null) {
@@ -556,22 +544,18 @@ class WaveSource {
     let total = 0;
     const waveDisplayMode =
       this.override?.waveDisplayMode ?? config.waveDisplayMode;
-
     if (waveDisplayMode === "both" || waveDisplayMode === "primary") {
       total += this.drawWave("primary", c);
     }
-
     if (waveDisplayMode === "both" || waveDisplayMode === "secondary") {
       total += this.drawWave("secondary", c);
     }
-
     return total;
   }
 
   drawWave(type, c) {
     const s = type === "primary" ? "Primary" : "Secondary";
     const o = this.override;
-
     const speed = o?.["speed" + s] ?? config["speed" + s];
     const interval = o?.["interval" + s] ?? config["interval" + s];
     const strokeW = o?.["stroke" + s] ?? config["stroke" + s];
@@ -582,7 +566,6 @@ class WaveSource {
     const decayFactor = o?.["decayFactor" + s] ?? config["decayFactor" + s];
     const heartSize = o?.["heartSize" + s] ?? config["heartSize" + s];
     const maxWaves = o?.["maxWaves" + s] ?? config["maxWaves" + s];
-
     let wavesDrawn = 0;
     c.strokeWeight(strokeW);
     for (const s of this.imageSources) {
@@ -624,7 +607,6 @@ class WaveSource {
       this.override?.decayFactorPrimary ?? config.decayFactorPrimary,
       this.override?.decayFactorSecondary ?? config.decayFactorSecondary
     );
-
     const oldestWaveTime = this.t - (maxWaves - 1) * interval;
     if (oldestWaveTime < 0) return true;
     const r_max = speed * oldestWaveTime;
@@ -638,7 +620,7 @@ class WaveSource {
 }
 
 // ===================================================================
-// Funzioni di supporto
+// Funzioni di supporto (invariate)
 // ===================================================================
 function calcAlpha(base, r, maxR, decayFactor) {
   if (r <= 0) return 0;
@@ -659,7 +641,7 @@ function isHeartVisible(x, y, size) {
 }
 
 // ===================================================================
-// GESTIONE UI
+// GESTIONE UI (invariata)
 // ===================================================================
 function initializeUI() {
   document.querySelectorAll(".panel-header").forEach((header) => {
@@ -805,7 +787,7 @@ function initializeUI() {
   updateManageButtons();
 
   playAnimBtn.addEventListener("click", () => {
-    if (isPlayingAnimation) return;
+    if (isExporting || isPlayingAnimation) return;
     const anim = getSelectedAnimation();
     if (anim) {
       playAnimation(anim.name, anim.isUser);
@@ -858,11 +840,12 @@ function initializeUI() {
     .addEventListener("click", toggleRecording);
   document
     .getElementById("save-sequence-btn")
-    .addEventListener("click", toggleFrameSequence);
+    .addEventListener("click", () =>
+      alert("Funzione non ancora implementata.")
+    );
 
   document.getElementById("pause-btn").addEventListener("click", togglePause);
   document.getElementById("clear-btn").addEventListener("click", () => {
-    // Resetta lo stato dell'animazione quando si pulisce manualmente
     isPlayingAnimation = false;
     currentSequence = null;
     document.getElementById("play-animation-btn").textContent = "Avvia";
@@ -941,10 +924,10 @@ function updateUIFromState() {
 }
 
 // ===================================================================
-// Eventi mouse e tastiera
+// Eventi e Azioni (invariate)
 // ===================================================================
 function mousePressed(event) {
-  if (isPlayingAnimation && !isRecordingAnimation) return;
+  if (isExporting || (isPlayingAnimation && !isRecordingAnimation)) return;
   if (event.target.classList.contains("p5Canvas")) {
     if (isRecordingAnimation) {
       const t = (millis() - recordingStartTime) / 1000;
@@ -972,9 +955,6 @@ function keyPressed() {
   if (key === "r" || key === "R") resetSimulation();
 }
 
-// ===================================================================
-// Azioni principali
-// ===================================================================
 function togglePause() {
   paused = !paused;
   updateUIFromState();
@@ -983,6 +963,7 @@ function togglePause() {
 function clearSources() {
   sources.forEach((src) => src.destroy());
   sources = [];
+  t = 0;
   if (config.saveBackground) waveLayer.background(pal.bg);
   else waveLayer.clear();
 }
@@ -992,7 +973,6 @@ function resetSimulation() {
   currentSequence = null;
   document.getElementById("play-animation-btn").textContent = "Avvia";
   clearSources();
-  t = 0;
   paused = false;
 
   Object.assign(config, defaultConfig);
@@ -1009,24 +989,16 @@ function resetSimulation() {
   updateUIFromState();
 }
 
-function playAnimation(presetName, isUserPreset = false) {
-  const preset = isUserPreset
-    ? userAnimationPresets[presetName]
-    : animationPresets[presetName];
+function playAnimation(name, isUser) {
+  const preset = isUser ? userAnimationPresets[name] : animationPresets[name];
   if (preset) {
-    // *** CORREZIONE: Gestione dello stato più pulita ***
-    // Ferma qualsiasi animazione in corso e pulisce
     isPlayingAnimation = false;
     currentSequence = null;
     clearSources();
     document.getElementById("play-animation-btn").textContent = "Avvia";
-
     if (paused) togglePause();
-
-    // Avvia la nuova animazione
     currentSequence = JSON.parse(JSON.stringify(preset));
     currentSequence.events.sort((a, b) => a.time - b.time);
-
     animationTime = 0;
     nextEventIndex = 0;
     isPlayingAnimation = true;
@@ -1088,14 +1060,15 @@ function resizeCanvasAndContent(w, h) {
   waveLayer.resizeCanvas(newWidth, newHeight);
   maxR = Math.hypot(width, height);
   sources.forEach((src) => src.calculateImageSources());
-
   applyCanvasZoom();
 }
 
 // ===================================================================
-// Funzioni di Esportazione
+// NUOVA E ROBUSTA LOGICA DI ESPORTAZIONE
 // ===================================================================
+
 function saveSinglePNG() {
+  if (isExporting) return;
   const tempCanvas = createGraphics(width, height);
   if (config.saveBackground) {
     tempCanvas.background(pal.bg);
@@ -1115,8 +1088,10 @@ function toggleUIAccess(enabled) {
       "#ui-sidebar button, #ui-sidebar input, #ui-sidebar select"
     )
     .forEach((el) => {
-      const idsToKeepActive = ["record-video-btn", "save-sequence-btn"];
-      if (!idsToKeepActive.includes(el.id) || !enabled) {
+      // Permetti al pulsante di registrazione di essere cliccato per fermare
+      if (el.id === "record-video-btn" && isExporting) {
+        el.disabled = false;
+      } else {
         el.disabled = !enabled;
       }
     });
@@ -1128,93 +1103,118 @@ function getSelectedAnimation() {
   ).value;
   const selectedUser = document.getElementById("user-animation-select").value;
   if (selectedUser) {
-    return { name: selectedUser, isUser: true };
+    return {
+      name: selectedUser,
+      isUser: true,
+      ...userAnimationPresets[selectedUser],
+    };
   } else if (selectedDefault) {
-    return { name: selectedDefault, isUser: false };
+    return {
+      name: selectedDefault,
+      isUser: false,
+      ...animationPresets[selectedDefault],
+    };
   }
   return null;
 }
 
 function toggleRecording() {
-  const btn = document.getElementById("record-video-btn");
-
-  if (!isRecording) {
-    // START RECORDING
-    if (isSavingSequence) return;
+  if (!isExporting) {
+    // ---- INIZIA A REGISTRARE ----
     const anim = getSelectedAnimation();
     if (!anim) {
       alert("Per favore, seleziona un'animazione da registrare.");
       return;
     }
 
-    isRecording = true;
-    playAnimation(anim.name, anim.isUser);
-    capturer.start();
+    isExporting = true;
+    toggleUIAccess(false);
+    updateExportStatus("Preparazione rendering...");
+    const btn = document.getElementById("record-video-btn");
     btn.textContent = "Ferma e Salva";
     btn.classList.add("recording");
-    toggleUIAccess(false);
-    updateExportStatus("Registrazione in corso...");
+
+    clearSources();
+    capturer.start();
+
+    let time = 0;
+    let nextEventIndex = 0;
+    const frameDuration = 1 / 60; // 60 FPS
+    const sequence = JSON.parse(JSON.stringify(anim));
+    sequence.events.sort((a, b) => a.time - b.time);
+
+    function renderAndCapture() {
+      if (!isExporting) {
+        // Se l'utente ha premuto "Ferma"
+        finishRecording();
+        return;
+      }
+
+      // Aggiorna la simulazione a questo preciso istante
+      while (
+        nextEventIndex < sequence.events.length &&
+        time >= sequence.events[nextEventIndex].time
+      ) {
+        const event = sequence.events[nextEventIndex];
+        sources.unshift(
+          new WaveSource(event.x * width, event.y * height, event.override)
+        );
+        nextEventIndex++;
+      }
+      updateSimulation(frameDuration);
+      renderCanvas();
+      capturer.capture(canvas);
+
+      time += frameDuration;
+
+      if (time < sequence.duration) {
+        const progress = Math.round((time / sequence.duration) * 100);
+        updateExportStatus(`Rendering... ${progress}%`);
+        requestAnimationFrame(renderAndCapture); // Processa il prossimo frame
+      } else {
+        isExporting = false; // L'animazione è finita, fermati
+        finishRecording();
+      }
+    }
+
+    renderAndCapture(); // Inizia il ciclo di rendering manuale
   } else {
-    // STOP RECORDING
-    isRecording = false; // Stop capturing frames
-    updateExportStatus("Elaborazione video... Attendere.");
-    btn.disabled = true; // Disable button while saving
-
-    capturer.stop();
-    capturer.save((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "animazione-onde.webm";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      // Cleanup and UI reset
-      updateExportStatus("Video salvato!");
-      btn.textContent = "Registra Video (.webm)";
-      btn.classList.remove("recording");
-      toggleUIAccess(true);
-      btn.disabled = false;
-      clearSources(); // Clear canvas for next action
-    });
+    // ---- FERMA LA REGISTRAZIONE (azione utente) ----
+    isExporting = false;
+    updateExportStatus("Finalizzazione richiesta dall'utente...");
   }
 }
 
-function toggleFrameSequence() {
-  const btn = document.getElementById("save-sequence-btn");
+function finishRecording() {
+  updateExportStatus("Elaborazione video... Attendere.");
+  capturer.stop();
+  capturer.save((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "animazione-onde.webm";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-  if (!isSavingSequence) {
-    // START SAVING SEQUENCE
-    if (isRecording) return;
-    const anim = getSelectedAnimation();
-    if (!anim) {
-      alert("Per favore, seleziona un'animazione da salvare.");
-      return;
-    }
-    isSavingSequence = true;
-    frameCountForSequence = 0;
-    playAnimation(anim.name, anim.isUser);
-    btn.textContent = "Interrompi";
-    btn.classList.add("recording");
-    toggleUIAccess(false);
-    updateExportStatus("Salvataggio sequenza in corso...");
-  } else {
-    // STOP SAVING SEQUENCE
-    isSavingSequence = false;
-    btn.textContent = "Salva Sequenza (PNG)";
+    // Cleanup e reset della UI
+    updateExportStatus("Video salvato!");
+    const btn = document.getElementById("record-video-btn");
+    btn.textContent = "Registra Video (.webm)";
     btn.classList.remove("recording");
     toggleUIAccess(true);
-    updateExportStatus("Salvataggio sequenza interrotto.");
+    isExporting = false;
     clearSources();
-  }
+    renderCanvas(); // Pulisce il canvas mostrandolo vuoto
+  });
 }
 
 // ===================================================================
-// Resize finestra
+// Funzioni finali (invariate)
 // ===================================================================
 function windowResized() {
+  if (isExporting) return;
   const canvasContainer = document.getElementById("canvas-container");
   if (document.getElementById("format-select").value === "viewport") {
     resizeCanvas(canvasContainer.clientWidth, canvasContainer.clientHeight);
@@ -1225,9 +1225,6 @@ function windowResized() {
   applyCanvasZoom();
 }
 
-// ===================================================================
-// Aggiornamento stats
-// ===================================================================
 function updateStats() {
   stats.fps = frameRate();
   stats.sourcesCount = sources.length;
