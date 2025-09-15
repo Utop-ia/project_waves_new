@@ -46,7 +46,7 @@ const vectorPool = [];
 
 let isPlayingAnimation = false;
 let animationTime = 0;
-let currentSequence = [];
+let currentSequence = null;
 let nextEventIndex = 0;
 
 let isRecordingAnimation = false;
@@ -58,7 +58,7 @@ const userAnimationPresets = {};
 let capturer;
 let isRecording = false;
 let isSavingSequence = false;
-let sequenceFrameCount = 0;
+let frameCountForSequence = 0;
 
 const getPooledVector = (x, y) => {
   if (vectorPool.length > 0) {
@@ -428,12 +428,17 @@ function applyCanvasZoom() {
 // Ciclo draw
 // ===================================================================
 function draw() {
-  const dt = paused ? 0 : deltaTime / 1000;
+  // *** CORREZIONE: Limita il deltaTime per prevenire salti temporali ***
+  let dt = paused ? 0 : deltaTime / 1000;
+  dt = min(dt, 0.1); // Non permettere al dt di essere > 100ms (equivale a 10 FPS)
   t += dt;
 
+  // --- LOGICA ANIMAZIONE ---
   if (isPlayingAnimation && !paused) {
     animationTime += dt;
-    if (
+    // Esegui eventi
+    while (
+      currentSequence &&
       nextEventIndex < currentSequence.events.length &&
       animationTime >= currentSequence.events[nextEventIndex].time
     ) {
@@ -443,14 +448,29 @@ function draw() {
       );
       nextEventIndex++;
     }
-    if (animationTime >= currentSequence.duration) {
+    // Fine animazione
+    if (currentSequence && animationTime >= currentSequence.duration) {
       isPlayingAnimation = false;
+      currentSequence = null;
       document.getElementById("play-animation-btn").textContent = "Avvia";
-      if (isRecording) toggleRecording();
-      if (isSavingSequence) saveFrameSequence();
+
+      if (isRecording) {
+        toggleRecording(); // Ferma la registrazione video
+      }
+      if (isSavingSequence) {
+        // La sequenza di frame si ferma da sola
+        isSavingSequence = false;
+        const btn = document.getElementById("save-sequence-btn");
+        btn.textContent = "Salva Sequenza (PNG)";
+        btn.classList.remove("recording");
+        toggleUIAccess(true);
+        updateExportStatus("Salvataggio sequenza completato.");
+        clearSources();
+      }
     }
   }
 
+  // --- DISEGNO ---
   if (config.saveBackground) {
     waveLayer.background(pal.bg);
   } else {
@@ -484,11 +504,12 @@ function draw() {
 
   updateStats();
 
+  // --- ESPORTAZIONE ---
   if (isRecording) {
     capturer.capture(canvas);
   }
   if (isSavingSequence) {
-    save(`sequenza/frame_${nf(frameCount, 4)}.png`);
+    save(`sequenza/frame_${nf(frameCountForSequence++, 4)}.png`);
   }
 }
 
@@ -784,12 +805,10 @@ function initializeUI() {
   updateManageButtons();
 
   playAnimBtn.addEventListener("click", () => {
-    const selectedDefault = animPresetSelect.value;
-    const selectedUser = userAnimSelect.value;
-    if (selectedUser) {
-      playAnimation(selectedUser, true);
-    } else if (selectedDefault) {
-      playAnimation(selectedDefault, false);
+    if (isPlayingAnimation) return;
+    const anim = getSelectedAnimation();
+    if (anim) {
+      playAnimation(anim.name, anim.isUser);
     } else {
       alert("Per favore, seleziona un'animazione da avviare.");
     }
@@ -839,10 +858,16 @@ function initializeUI() {
     .addEventListener("click", toggleRecording);
   document
     .getElementById("save-sequence-btn")
-    .addEventListener("click", saveFrameSequence);
+    .addEventListener("click", toggleFrameSequence);
 
   document.getElementById("pause-btn").addEventListener("click", togglePause);
-  document.getElementById("clear-btn").addEventListener("click", clearSources);
+  document.getElementById("clear-btn").addEventListener("click", () => {
+    // Resetta lo stato dell'animazione quando si pulisce manualmente
+    isPlayingAnimation = false;
+    currentSequence = null;
+    document.getElementById("play-animation-btn").textContent = "Avvia";
+    clearSources();
+  });
   document
     .getElementById("reset-btn")
     .addEventListener("click", resetSimulation);
@@ -919,7 +944,7 @@ function updateUIFromState() {
 // Eventi mouse e tastiera
 // ===================================================================
 function mousePressed(event) {
-  if (isPlayingAnimation || isRecordingAnimation) return;
+  if (isPlayingAnimation && !isRecordingAnimation) return;
   if (event.target.classList.contains("p5Canvas")) {
     if (isRecordingAnimation) {
       const t = (millis() - recordingStartTime) / 1000;
@@ -938,7 +963,12 @@ function keyPressed() {
   if (document.activeElement.tagName === "INPUT") return;
   if (key === " ") togglePause();
   if (key === "s" || key === "S") saveSinglePNG();
-  if (key === "c" || key === "C") clearSources();
+  if (key === "c" || key === "C") {
+    isPlayingAnimation = false;
+    currentSequence = null;
+    document.getElementById("play-animation-btn").textContent = "Avvia";
+    clearSources();
+  }
   if (key === "r" || key === "R") resetSimulation();
 }
 
@@ -951,8 +981,6 @@ function togglePause() {
 }
 
 function clearSources() {
-  isPlayingAnimation = false;
-  document.getElementById("play-animation-btn").textContent = "Avvia";
   sources.forEach((src) => src.destroy());
   sources = [];
   if (config.saveBackground) waveLayer.background(pal.bg);
@@ -960,6 +988,9 @@ function clearSources() {
 }
 
 function resetSimulation() {
+  isPlayingAnimation = false;
+  currentSequence = null;
+  document.getElementById("play-animation-btn").textContent = "Avvia";
   clearSources();
   t = 0;
   paused = false;
@@ -983,10 +1014,17 @@ function playAnimation(presetName, isUserPreset = false) {
     ? userAnimationPresets[presetName]
     : animationPresets[presetName];
   if (preset) {
+    // *** CORREZIONE: Gestione dello stato più pulita ***
+    // Ferma qualsiasi animazione in corso e pulisce
+    isPlayingAnimation = false;
+    currentSequence = null;
     clearSources();
+    document.getElementById("play-animation-btn").textContent = "Avvia";
+
     if (paused) togglePause();
 
-    currentSequence = preset;
+    // Avvia la nuova animazione
+    currentSequence = JSON.parse(JSON.stringify(preset));
     currentSequence.events.sort((a, b) => a.time - b.time);
 
     animationTime = 0;
@@ -1078,7 +1116,7 @@ function toggleUIAccess(enabled) {
     )
     .forEach((el) => {
       const idsToKeepActive = ["record-video-btn", "save-sequence-btn"];
-      if (!idsToKeepActive.includes(el.id)) {
+      if (!idsToKeepActive.includes(el.id) || !enabled) {
         el.disabled = !enabled;
       }
     });
@@ -1098,17 +1136,18 @@ function getSelectedAnimation() {
 }
 
 function toggleRecording() {
-  if (isSavingSequence) return;
-  isRecording = !isRecording;
   const btn = document.getElementById("record-video-btn");
 
-  if (isRecording) {
+  if (!isRecording) {
+    // START RECORDING
+    if (isSavingSequence) return;
     const anim = getSelectedAnimation();
     if (!anim) {
       alert("Per favore, seleziona un'animazione da registrare.");
-      isRecording = false;
       return;
     }
+
+    isRecording = true;
     playAnimation(anim.name, anim.isUser);
     capturer.start();
     btn.textContent = "Ferma e Salva";
@@ -1116,7 +1155,11 @@ function toggleRecording() {
     toggleUIAccess(false);
     updateExportStatus("Registrazione in corso...");
   } else {
+    // STOP RECORDING
+    isRecording = false; // Stop capturing frames
     updateExportStatus("Elaborazione video... Attendere.");
+    btn.disabled = true; // Disable button while saving
+
     capturer.stop();
     capturer.save((blob) => {
       const url = URL.createObjectURL(blob);
@@ -1127,38 +1170,43 @@ function toggleRecording() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      // Cleanup and UI reset
       updateExportStatus("Video salvato!");
       btn.textContent = "Registra Video (.webm)";
       btn.classList.remove("recording");
       toggleUIAccess(true);
-      clearSources();
+      btn.disabled = false;
+      clearSources(); // Clear canvas for next action
     });
   }
 }
 
-function saveFrameSequence() {
-  if (isRecording) return;
-  isSavingSequence = !isSavingSequence;
+function toggleFrameSequence() {
   const btn = document.getElementById("save-sequence-btn");
 
-  if (isSavingSequence) {
+  if (!isSavingSequence) {
+    // START SAVING SEQUENCE
+    if (isRecording) return;
     const anim = getSelectedAnimation();
     if (!anim) {
       alert("Per favore, seleziona un'animazione da salvare.");
-      isSavingSequence = false;
       return;
     }
-    sequenceFrameCount = 0;
+    isSavingSequence = true;
+    frameCountForSequence = 0;
     playAnimation(anim.name, anim.isUser);
     btn.textContent = "Interrompi";
     btn.classList.add("recording");
     toggleUIAccess(false);
     updateExportStatus("Salvataggio sequenza in corso...");
   } else {
+    // STOP SAVING SEQUENCE
+    isSavingSequence = false;
     btn.textContent = "Salva Sequenza (PNG)";
     btn.classList.remove("recording");
     toggleUIAccess(true);
-    updateExportStatus("Salvataggio sequenza completato.");
+    updateExportStatus("Salvataggio sequenza interrotto.");
     clearSources();
   }
 }
