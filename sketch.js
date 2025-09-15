@@ -14,7 +14,7 @@ const config = {
   intervalSecondary: 0.2,
   strokeSecondary: 20,
   alphaSecondary: 0.8,
-  decayFactorSecondary: 1.5,
+  decayFactorSecondary: 1.5, // <---- ensure exists
   heartSizeSecondary: 1,
   maxWavesSecondary: 5,
 
@@ -44,6 +44,9 @@ let maxR;
 let waveLayer;
 const vectorPool = [];
 
+// ---- PATCH: riferimento canvas globale per CCapture
+let p5Canvas;
+
 let isPlayingAnimation = false;
 let animationTime = 0;
 let currentSequence = null;
@@ -55,7 +58,7 @@ let recordedEvents = [];
 let savedAnimationCount = 0;
 const userAnimationPresets = {};
 
-let capturer;
+let capturer; // istanziato al momento della registrazione
 let isExporting = false; // Stato unificato per qualsiasi tipo di esportazione
 
 const getPooledVector = (x, y) => {
@@ -71,7 +74,7 @@ const returnToPool = (v) => {
 };
 
 // ===================================================================
-// PRESET DEGLI STATI DEL BRAND
+// PRESET DEGLI STATI DEL BRAND (con fix decayFactorSecondary)
 // ===================================================================
 const brandPresets = {
   "Flusso Armonico (Default)": {
@@ -83,13 +86,15 @@ const brandPresets = {
       decayFactorPrimary: 2.0,
       heartSizePrimary: 1,
       maxWavesPrimary: 3,
+
       speedSecondary: 50,
       intervalSecondary: 0.4,
       strokeSecondary: 25,
       alphaSecondary: 0.8,
-      decayFactorSecondary: 2.0,
+      decayFactorSecondary: 2.0, // FIX
       heartSizeSecondary: 1,
       maxWavesSecondary: 3,
+
       maxReflections: 2,
     },
   },
@@ -102,13 +107,15 @@ const brandPresets = {
       decayFactorPrimary: 0.8,
       heartSizePrimary: 0.8,
       maxWavesPrimary: 5,
+
       speedSecondary: 120,
       intervalSecondary: 0.1,
       strokeSecondary: 15,
       alphaSecondary: 0.9,
-      decayFactorPrimary: 0.8,
+      decayFactorSecondary: 0.8, // FIX
       heartSizeSecondary: 0.8,
       maxWavesSecondary: 5,
+
       maxReflections: 1,
     },
   },
@@ -121,13 +128,15 @@ const brandPresets = {
       decayFactorPrimary: 3.0,
       heartSizePrimary: 1.2,
       maxWavesPrimary: 10,
+
       speedSecondary: 20,
       intervalSecondary: 0.8,
       strokeSecondary: 30,
       alphaSecondary: 0.4,
-      decayFactorPrimary: 3.0,
+      decayFactorSecondary: 3.0, // FIX
       heartSizeSecondary: 1.2,
       maxWavesSecondary: 10,
+
       maxReflections: 4,
     },
   },
@@ -140,13 +149,15 @@ const brandPresets = {
       decayFactorPrimary: 2.5,
       heartSizePrimary: 1.5,
       maxWavesPrimary: 5,
+
       speedSecondary: 40,
       intervalSecondary: 0.4,
       strokeSecondary: 60,
       alphaSecondary: 0.85,
-      decayFactorPrimary: 2.5,
+      decayFactorSecondary: 2.5, // FIX
       heartSizeSecondary: 1.5,
       maxWavesSecondary: 5,
+
       maxReflections: 2,
     },
   },
@@ -159,13 +170,15 @@ const brandPresets = {
       decayFactorPrimary: 4.0,
       heartSizePrimary: 1,
       maxWavesPrimary: 5,
+
       speedSecondary: 15,
       intervalSecondary: 1.5,
       strokeSecondary: 5,
       alphaSecondary: 0.2,
-      decayFactorPrimary: 4.0,
+      decayFactorSecondary: 4.0, // FIX
       heartSizeSecondary: 1,
       maxWavesSecondary: 5,
+
       maxReflections: 1,
     },
   },
@@ -178,13 +191,15 @@ const brandPresets = {
       decayFactorPrimary: 1.5,
       heartSizePrimary: 0.5,
       maxWavesPrimary: 7,
+
       speedSecondary: 25,
       intervalSecondary: 0.6,
       strokeSecondary: 90,
       alphaSecondary: 0.7,
-      decayFactorPrimary: 2.5,
+      decayFactorSecondary: 2.5, // FIX
       heartSizeSecondary: 2,
       maxWavesSecondary: 7,
+
       maxReflections: 3,
     },
   },
@@ -359,11 +374,12 @@ function drawHeartShapeUniversal(c, x, y, size) {
 // ===================================================================
 function setup() {
   const canvasContainer = document.getElementById("canvas-container");
-  const canvas = createCanvas(
+  // ---- PATCH: conserva riferimento globale al canvas p5
+  p5Canvas = createCanvas(
     canvasContainer.clientWidth,
     canvasContainer.clientHeight
   );
-  canvas.parent(canvasContainer);
+  p5Canvas.parent(canvasContainer);
 
   pixelDensity(1);
   frameRate(60);
@@ -376,13 +392,7 @@ function setup() {
   initializeUI();
   updateUIFromState();
 
-  capturer = new CCapture({
-    format: "webm",
-    framerate: 60,
-    verbose: false,
-    name: "animazione-onde",
-    quality: 98,
-  });
+  // (PATCH) CCapture verrà istanziato on-demand all'avvio della registrazione
 }
 
 // ===================================================================
@@ -492,7 +502,7 @@ function renderCanvas() {
     noStroke();
     rect(0, 0, width, height);
     fill(255, 255, 255, 200);
-    textSize(min(width, height) * 0.1);
+    textSize(Math.min(width, height) * 0.1);
     textAlign(CENTER, CENTER);
     textStyle(BOLD);
     text("PAUSA", width / 2, height / 2);
@@ -502,7 +512,7 @@ function renderCanvas() {
 }
 
 // ===================================================================
-// WaveSource Class (invariata)
+// WaveSource Class
 // ===================================================================
 class WaveSource {
   constructor(x, y, override = null) {
@@ -554,25 +564,28 @@ class WaveSource {
   }
 
   drawWave(type, c) {
-    const s = type === "primary" ? "Primary" : "Secondary";
+    const suffix = type === "primary" ? "Primary" : "Secondary"; // PATCH: leggibilità
     const o = this.override;
-    const speed = o?.["speed" + s] ?? config["speed" + s];
-    const interval = o?.["interval" + s] ?? config["interval" + s];
-    const strokeW = o?.["stroke" + s] ?? config["stroke" + s];
-    const alphaBase = o?.["alpha" + s] ?? config["alpha" + s];
+    const speed = o?.["speed" + suffix] ?? config["speed" + suffix];
+    const interval = o?.["interval" + suffix] ?? config["interval" + suffix];
+    const strokeW = o?.["stroke" + suffix] ?? config["stroke" + suffix];
+    const alphaBase = o?.["alpha" + suffix] ?? config["alpha" + suffix];
     const color =
       o?.["stroke" + (type === "primary" ? "" : "2")] ??
       pal["stroke" + (type === "primary" ? "" : "2")];
-    const decayFactor = o?.["decayFactor" + s] ?? config["decayFactor" + s];
-    const heartSize = o?.["heartSize" + s] ?? config["heartSize" + s];
-    const maxWaves = o?.["maxWaves" + s] ?? config["maxWaves" + s];
+    const decayFactor =
+      o?.["decayFactor" + suffix] ?? config["decayFactor" + suffix];
+    const heartSize = o?.["heartSize" + suffix] ?? config["heartSize" + suffix];
+    const maxWaves = o?.["maxWaves" + suffix] ?? config["maxWaves" + suffix];
+
     let wavesDrawn = 0;
     c.strokeWeight(strokeW);
-    for (const s of this.imageSources) {
+    for (const imgSrc of this.imageSources) {
       for (let i = 0; i < maxWaves; i++) {
         const r = speed * (this.t - i * interval);
         if (r < 0 || r > maxR) continue;
-        if (!isHeartVisible(s.pos.x, s.pos.y, r * 2 * heartSize)) continue;
+        if (!isHeartVisible(imgSrc.pos.x, imgSrc.pos.y, r * 2 * heartSize))
+          continue;
         const alpha = calcAlpha(alphaBase, r, maxR, decayFactor);
         if (alpha < config.alphaThreshold) continue;
         const hexAlpha = Math.floor(alpha * 255)
@@ -580,8 +593,8 @@ class WaveSource {
           .padStart(2, "0");
         c.stroke(`${color}${hexAlpha}`);
         c.push();
-        c.translate(s.pos.x, s.pos.y);
-        c.scale(s.scaleX, s.scaleY);
+        c.translate(imgSrc.pos.x, imgSrc.pos.y);
+        c.scale(imgSrc.scaleX, imgSrc.scaleY);
         drawHeartShapeUniversal(c, 0, 0, r * 2 * heartSize);
         c.pop();
         wavesDrawn++;
@@ -620,7 +633,7 @@ class WaveSource {
 }
 
 // ===================================================================
-// Funzioni di supporto (invariate)
+// Funzioni di supporto
 // ===================================================================
 function calcAlpha(base, r, maxR, decayFactor) {
   if (r <= 0) return 0;
@@ -641,7 +654,7 @@ function isHeartVisible(x, y, size) {
 }
 
 // ===================================================================
-// GESTIONE UI (invariata)
+// GESTIONE UI
 // ===================================================================
 function initializeUI() {
   document.querySelectorAll(".panel-header").forEach((header) => {
@@ -924,7 +937,7 @@ function updateUIFromState() {
 }
 
 // ===================================================================
-// Eventi e Azioni (invariate)
+// Eventi e Azioni
 // ===================================================================
 function mousePressed(event) {
   if (isExporting || (isPlayingAnimation && !isRecordingAnimation)) return;
@@ -1064,18 +1077,35 @@ function resizeCanvasAndContent(w, h) {
 }
 
 // ===================================================================
-// NUOVA E ROBUSTA LOGICA DI ESPORTAZIONE
+// LOGICA DI ESPORTAZIONE (PATCHATA)
 // ===================================================================
 
 function saveSinglePNG() {
   if (isExporting) return;
-  const tempCanvas = createGraphics(width, height);
+  const g = createGraphics(width, height);
   if (config.saveBackground) {
-    tempCanvas.background(pal.bg);
+    g.background(pal.bg);
   }
-  tempCanvas.image(waveLayer, 0, 0);
-  tempCanvas.save("onda_singola.png");
-  tempCanvas.remove();
+  g.image(waveLayer, 0, 0);
+
+  // Prova a usare p5 saveCanvas; fallback DOM se non supportato
+  try {
+    saveCanvas(g, "onda_singola", "png");
+  } catch (e) {
+    const temp = document.createElement("canvas");
+    temp.width = g.width;
+    temp.height = g.height;
+    const ctx = temp.getContext("2d");
+    const srcCanvas = g.elt || g.canvas;
+    ctx.drawImage(srcCanvas, 0, 0);
+    const a = document.createElement("a");
+    a.href = temp.toDataURL("image/png");
+    a.download = "onda_singola.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+  g.remove();
 }
 
 function updateExportStatus(message) {
@@ -1127,6 +1157,15 @@ function toggleRecording() {
       return;
     }
 
+    // PATCH: re-instanzia CCapture ogni volta
+    capturer = new CCapture({
+      format: "webm",
+      framerate: 60,
+      verbose: false,
+      name: "animazione-onde",
+      quality: 98,
+    });
+
     isExporting = true;
     toggleUIAccess(false);
     updateExportStatus("Preparazione rendering...");
@@ -1163,16 +1202,18 @@ function toggleRecording() {
       }
       updateSimulation(frameDuration);
       renderCanvas();
-      capturer.capture(canvas);
+
+      // PATCH: cattura il canvas giusto
+      capturer.capture(p5Canvas.elt);
 
       time += frameDuration;
 
       if (time < sequence.duration) {
         const progress = Math.round((time / sequence.duration) * 100);
         updateExportStatus(`Rendering... ${progress}%`);
-        requestAnimationFrame(renderAndCapture); // Processa il prossimo frame
+        requestAnimationFrame(renderAndCapture); // Prossimo frame
       } else {
-        isExporting = false; // L'animazione è finita, fermati
+        isExporting = false; // L'animazione è finita
         finishRecording();
       }
     }
@@ -1188,30 +1229,22 @@ function toggleRecording() {
 function finishRecording() {
   updateExportStatus("Elaborazione video... Attendere.");
   capturer.stop();
-  capturer.save((blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "animazione-onde.webm";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // PATCH: versione compatibile (senza callback)
+  capturer.save();
 
-    // Cleanup e reset della UI
-    updateExportStatus("Video salvato!");
-    const btn = document.getElementById("record-video-btn");
-    btn.textContent = "Registra Video (.webm)";
-    btn.classList.remove("recording");
-    toggleUIAccess(true);
-    isExporting = false;
-    clearSources();
-    renderCanvas(); // Pulisce il canvas mostrandolo vuoto
-  });
+  // Cleanup e reset della UI
+  const btn = document.getElementById("record-video-btn");
+  btn.textContent = "Registra Video (.webm)";
+  btn.classList.remove("recording");
+  toggleUIAccess(true);
+  isExporting = false;
+  clearSources();
+  renderCanvas(); // Pulisce il canvas mostrandolo vuoto
+  updateExportStatus("Video salvato!");
 }
 
 // ===================================================================
-// Funzioni finali (invariate)
+// Funzioni finali
 // ===================================================================
 function windowResized() {
   if (isExporting) return;
